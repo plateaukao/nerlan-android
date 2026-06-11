@@ -1,0 +1,89 @@
+package com.example.nerlan.data
+
+import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import okhttp3.Request
+
+/**
+ * Downloads episode MP3s for offline playback into filesDir/audio/{episodeId}.mp3.
+ * Channel+ serves direct audio files, so a plain streaming copy suffices.
+ */
+class DownloadManager(filesDir: File) {
+  private val recordsFile = File(filesDir, "downloads.json")
+  private val audioDir = File(filesDir, "audio").apply { mkdirs() }
+  private val json = Json { ignoreUnknownKeys = true }
+  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+  private val _records = MutableStateFlow(
+    runCatching { json.decodeFromString<List<EpisodeRecord>>(recordsFile.readText()) }
+      .getOrNull() ?: emptyList()
+  )
+  val records: StateFlow<List<EpisodeRecord>> = _records
+
+  /** episodeId -> 0f..1f while a download is in flight */
+  private val _progress = MutableStateFlow<Map<String, Float>>(emptyMap())
+  val progress: StateFlow<Map<String, Float>> = _progress
+
+  private fun fileFor(episodeId: String) = File(audioDir, "$episodeId.mp3")
+
+  fun isDownloaded(episodeId: String) = fileFor(episodeId).exists()
+
+  fun isDownloading(episodeId: String) = _progress.value.containsKey(episodeId)
+
+  fun localPath(episodeId: String): String? =
+    fileFor(episodeId).takeIf { it.exists() }?.absolutePath
+
+  fun download(record: EpisodeRecord) {
+    val url = record.audio ?: return
+    if (isDownloaded(record.id) || isDownloading(record.id)) return
+    _progress.value += (record.id to 0f)
+    scope.launch {
+      val dest = fileFor(record.id)
+      val tmp = File(dest.path + ".part")
+      try {
+        val request = Request.Builder().url(url).build()
+        ChannelPlusApi.client.newCall(request).execute().use { response ->
+          if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+          val body = response.body ?: throw Exception("empty body")
+          val total = body.contentLength()
+          body.byteStream().use { input ->
+            tmp.outputStream().use { output ->
+              val buffer = ByteArray(64 * 1024)
+              var copied = 0L
+              while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                output.write(buffer, 0, n)
+                copied += n
+                if (total > 0) {
+                  _progress.value += (record.id to (copied.toFloat() / total).coerceAtMost(1f))
+                }
+              }
+            }
+          }
+        }
+        tmp.renameTo(dest)
+        if (_records.value.none { it.id == record.id }) {
+          _records.value += record
+          recordsFile.writeText(json.encodeToString(_records.value))
+        }
+      } catch (_: Exception) {
+        tmp.delete()
+      } finally {
+        _progress.value -= record.id
+      }
+    }
+  }
+
+  fun delete(episodeId: String) {
+    fileFor(episodeId).delete()
+    _records.value = _records.value.filterNot { it.id == episodeId }
+    recordsFile.writeText(json.encodeToString(_records.value))
+  }
+}

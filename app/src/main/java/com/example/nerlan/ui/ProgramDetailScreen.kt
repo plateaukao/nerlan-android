@@ -247,19 +247,22 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
         tint = MaterialTheme.colorScheme.error,
       )
     }
-    when {
-      isDownloaded -> Icon(
-        Icons.Filled.CheckCircle,
-        contentDescription = "已下載",
-        tint = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.size(24.dp),
-      )
-      progress != null -> CircularProgressIndicator(
-        progress = { progress },
-        modifier = Modifier.size(24.dp),
-      )
-      else -> IconButton(onClick = { downloads.download(record) }, enabled = playable) {
-        Icon(Icons.Filled.ArrowDownward, contentDescription = "下載")
+    // All three states share the 48dp IconButton footprint so row columns align.
+    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+      when {
+        isDownloaded -> Icon(
+          Icons.Filled.CheckCircle,
+          contentDescription = "已下載",
+          tint = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.size(24.dp),
+        )
+        progress != null -> CircularProgressIndicator(
+          progress = { progress },
+          modifier = Modifier.size(24.dp),
+        )
+        else -> IconButton(onClick = { downloads.download(record) }, enabled = playable) {
+          Icon(Icons.Filled.ArrowDownward, contentDescription = "下載")
+        }
       }
     }
   }

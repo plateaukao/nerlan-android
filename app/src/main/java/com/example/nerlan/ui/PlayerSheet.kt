@@ -9,12 +9,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Forward
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
@@ -132,7 +132,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           Icon(Icons.Filled.SkipPrevious, "上一集", Modifier.size(32.dp))
         }
         IconButton(onClick = { PlayerManager.skip(-15_000) }) {
-          Icon(Icons.Filled.Replay, "倒退15秒", Modifier.size(28.dp))
+          Icon(Icons.Filled.FastRewind, "倒退15秒", Modifier.size(28.dp))
         }
         IconButton(onClick = { PlayerManager.togglePlayPause() }, modifier = Modifier.size(72.dp)) {
           Icon(
@@ -143,7 +143,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           )
         }
         IconButton(onClick = { PlayerManager.skip(15_000) }) {
-          Icon(Icons.Filled.Forward, "快轉15秒", Modifier.size(28.dp))
+          Icon(Icons.Filled.FastForward, "快轉15秒", Modifier.size(28.dp))
         }
         IconButton(onClick = { PlayerManager.next() }, enabled = hasNext) {
           Icon(Icons.Filled.SkipNext, "下一集", Modifier.size(32.dp))

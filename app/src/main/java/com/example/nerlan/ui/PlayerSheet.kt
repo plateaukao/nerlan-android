@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
@@ -58,6 +60,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   val hasNext by PlayerManager.hasNext.collectAsState()
   val hasPrevious by PlayerManager.hasPrevious.collectAsState()
   val rate by PlayerManager.playbackRate.collectAsState()
+  val repeatMode by PlayerManager.repeatMode.collectAsState()
   val favEpisodes by favorites.episodes.collectAsState()
   val progressMap by downloads.progress.collectAsState()
   val downloadRecords by downloads.records.collectAsState()
@@ -150,12 +153,28 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         }
       }
 
-      // Speed / favorite / download
+      // Speed / repeat / favorite / download
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(32.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
       ) {
+        IconButton(onClick = { PlayerManager.cycleRepeatMode() }) {
+          Icon(
+            if (repeatMode == androidx.media3.common.Player.REPEAT_MODE_ONE) Icons.Filled.RepeatOne
+            else Icons.Filled.Repeat,
+            contentDescription = when (repeatMode) {
+              androidx.media3.common.Player.REPEAT_MODE_ALL -> "重複播放清單"
+              androidx.media3.common.Player.REPEAT_MODE_ONE -> "重複單集"
+              else -> "不重複"
+            },
+            tint = if (repeatMode == androidx.media3.common.Player.REPEAT_MODE_OFF)
+              MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+          )
+        }
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
           TextButton(onClick = { speedMenuOpen = true }) {
             Icon(Icons.Filled.Speed, contentDescription = null, modifier = Modifier.size(20.dp))

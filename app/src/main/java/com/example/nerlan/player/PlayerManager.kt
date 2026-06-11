@@ -54,10 +54,14 @@ object PlayerManager {
   private val _playbackRate = MutableStateFlow(1.0f)
   val playbackRate: StateFlow<Float> = _playbackRate
 
+  private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
+  val repeatMode: StateFlow<Int> = _repeatMode
+
   fun initialize(context: Context) {
     if (controller != null) return
     val prefs = context.getSharedPreferences("player", Context.MODE_PRIVATE)
     _playbackRate.value = prefs.getFloat("playbackRate", 1.0f)
+    _repeatMode.value = prefs.getInt("repeatMode", Player.REPEAT_MODE_OFF)
 
     val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
     val future = MediaController.Builder(context, token).buildAsync()
@@ -65,9 +69,13 @@ object PlayerManager {
       val c = future.get()
       controller = c
       c.setPlaybackSpeed(_playbackRate.value)
+      c.repeatMode = _repeatMode.value
       c.addListener(object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
           _isPlaying.value = isPlaying
+        }
+        override fun onRepeatModeChanged(repeatMode: Int) {
+          _repeatMode.value = repeatMode
         }
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
           _current.value = mediaItem?.let(::recordOf)
@@ -144,6 +152,19 @@ object PlayerManager {
   fun skip(deltaMs: Long) {
     val c = controller ?: return
     c.seekTo((c.currentPosition + deltaMs).coerceAtLeast(0))
+  }
+
+  /** Cycle no-repeat -> repeat all -> repeat one. */
+  fun cycleRepeatMode() {
+    val next = when (_repeatMode.value) {
+      Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+      Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+      else -> Player.REPEAT_MODE_OFF
+    }
+    _repeatMode.value = next
+    controller?.repeatMode = next
+    NerLanApp.instance.getSharedPreferences("player", Context.MODE_PRIVATE)
+      .edit().putInt("repeatMode", next).apply()
   }
 
   fun setRate(rate: Float) {

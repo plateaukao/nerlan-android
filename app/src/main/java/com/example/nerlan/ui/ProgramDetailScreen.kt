@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -93,9 +94,13 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
 
   val records = remember(episodes) { episodes.map { EpisodeRecord.from(it, program) } }
 
+  // The parent (MainScreen) Scaffold already insets below the status bar;
+  // zero out this nested Scaffold's insets to avoid double top spacing.
   Scaffold(
+    contentWindowInsets = WindowInsets(0),
     topBar = {
       TopAppBar(
+        windowInsets = WindowInsets(0),
         title = { Text(program.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = {
           IconButton(onClick = onBack) {

@@ -1,28 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Speech bubble with equalizer bars: language learning by radio/audio. -->
+<!-- Headphones around an "A文" badge: listening + language. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- speech bubble -->
+    <!-- headband -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="5.4"
+        android:strokeLineCap="round"
+        android:pathData="M28.8,61.2 v-7.2 a25.2,25.2 0 0 1 50.4,0 v7.2" />
+    <!-- ear cups -->
     <path
         android:fillColor="#FFFFFFFF"
-        android:pathData="M42,32 h24 a10,10 0 0 1 10,10 v14 a10,10 0 0 1 -10,10 H52 l-9,10 v-10 h-1 a10,10 0 0 1 -10,-10 V42 a10,10 0 0 1 10,-10 Z" />
-    <!-- equalizer bars (punched in the gradient color range) -->
+        android:pathData="M24,64.2 a5.4,5.4 0 0 1 5.4,-5.4 h0 a5.4,5.4 0 0 1 5.4,5.4 v8.4 a5.4,5.4 0 0 1 -5.4,5.4 h0 a5.4,5.4 0 0 1 -5.4,-5.4 Z" />
     <path
-        android:strokeColor="#FF2F62D8"
-        android:strokeWidth="4.5"
-        android:strokeLineCap="round"
-        android:pathData="M46,46 L46,52" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M73.2,64.2 a5.4,5.4 0 0 1 5.4,-5.4 h0 a5.4,5.4 0 0 1 5.4,5.4 v8.4 a5.4,5.4 0 0 1 -5.4,5.4 h0 a5.4,5.4 0 0 1 -5.4,-5.4 Z" />
+    <!-- A -->
     <path
-        android:strokeColor="#FF2F62D8"
-        android:strokeWidth="4.5"
-        android:strokeLineCap="round"
-        android:pathData="M54,42 L54,56" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M51.76 71.86H50.03L47.89 67.20H42.15L40.02 71.86H38.22L44.79 57.40H45.28ZM47.15 65.55 45.04 60.86 42.91 65.55Z" />
+    <!-- 文 -->
     <path
-        android:strokeColor="#FF2F62D8"
-        android:strokeWidth="4.5"
-        android:strokeLineCap="round"
-        android:pathData="M62,45 L62,53" />
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M58.50 62.77Q58.59 63.42 58.80 64.21Q59.01 65.00 59.35 65.81Q59.69 66.62 60.15 67.38Q60.61 68.15 61.21 68.72Q61.63 68.28 62.01 67.74Q62.38 67.19 62.68 66.48Q62.98 65.77 63.20 64.86Q63.42 63.95 63.55 62.77ZM60.99 61.46Q60.70 60.44 60.14 59.36L61.99 58.93Q62.06 59.48 62.20 60.16Q62.35 60.84 62.53 61.46Q64.50 61.45 65.94 61.41Q67.38 61.38 68.53 61.29V62.93Q67.82 62.88 67.00 62.85Q66.19 62.82 65.20 62.79Q64.81 65.24 64.07 66.87Q63.33 68.50 62.31 69.61Q65.44 71.82 69.15 71.72Q68.81 71.99 68.58 72.21Q68.35 72.43 68.19 72.65Q68.02 72.87 67.91 73.09Q67.80 73.31 67.72 73.59Q66.80 73.43 65.87 73.13Q64.93 72.82 64.07 72.43Q63.21 72.04 62.46 71.60Q61.70 71.16 61.12 70.70Q60.53 71.14 59.76 71.59Q59.00 72.04 58.18 72.44Q57.37 72.84 56.57 73.14Q55.77 73.45 55.12 73.60Q55.04 73.11 54.75 72.70Q54.46 72.29 53.91 71.95Q55.66 71.77 57.27 71.16Q58.88 70.56 60.05 69.71Q59.44 69.03 58.95 68.16Q58.45 67.30 58.07 66.38Q57.69 65.46 57.43 64.53Q57.18 63.61 57.06 62.79Q56.19 62.81 55.43 62.84Q54.66 62.88 53.98 62.93V61.29Q55.29 61.38 56.95 61.42Q58.61 61.46 60.99 61.46Z" />
 </vector>

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.example.nerlan.NerLanApp
 
 /** Offline episodes, groupable by program or by language. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DownloadsScreen() {
   val downloads = NerLanApp.instance.downloads
@@ -52,7 +54,7 @@ fun DownloadsScreen() {
       ) {
         Text(
           "下載",
-          style = MaterialTheme.typography.headlineMedium,
+          style = MaterialTheme.typography.headlineMediumEmphasized,
           fontWeight = FontWeight.Bold,
           modifier = Modifier.weight(1f),
         )

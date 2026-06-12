@@ -20,7 +20,10 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -48,7 +51,7 @@ import com.example.nerlan.NerLanApp
 import com.example.nerlan.player.PlayerManager
 
 /** Full player sheet with transport, speed, favorite and download controls. */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayerSheet(onDismiss: () -> Unit) {
   val favorites = NerLanApp.instance.favorites
@@ -137,12 +140,17 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         IconButton(onClick = { PlayerManager.skip(-15_000) }) {
           Icon(Icons.Filled.FastRewind, "倒退15秒", Modifier.size(28.dp))
         }
-        IconButton(onClick = { PlayerManager.togglePlayPause() }, modifier = Modifier.size(72.dp)) {
+        // Expressive shape-morphing primary action: round while paused,
+        // rounded-square while pressed/playing.
+        FilledIconButton(
+          onClick = { PlayerManager.togglePlayPause() },
+          shapes = IconButtonDefaults.shapes(),
+          modifier = Modifier.size(72.dp),
+        ) {
           Icon(
             if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             contentDescription = "播放/暫停",
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(40.dp),
           )
         }
         IconButton(onClick = { PlayerManager.skip(15_000) }) {
@@ -216,7 +224,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
             )
             Text("已下載", modifier = Modifier.padding(start = 4.dp))
           }
-          progress != null -> CircularProgressIndicator(progress = { progress }, modifier = Modifier.size(24.dp))
+          progress != null -> CircularWavyProgressIndicator(progress = { progress }, modifier = Modifier.size(24.dp))
           else -> TextButton(onClick = { downloads.download(record) }) {
             Icon(Icons.Filled.ArrowDownward, contentDescription = null, modifier = Modifier.size(20.dp))
             Text("下載", modifier = Modifier.padding(start = 4.dp))

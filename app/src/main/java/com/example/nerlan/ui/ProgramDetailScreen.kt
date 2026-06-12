@@ -22,6 +22,9 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,7 +55,7 @@ import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
 
 /** Program info plus its full episode archive (infinite scroll, oldest first). */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
   val favorites = NerLanApp.instance.favorites
@@ -182,7 +185,7 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
       if (isLoading) {
         item {
           Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(Modifier.size(24.dp))
+            LoadingIndicator(Modifier.size(32.dp))
           }
         }
       }
@@ -191,6 +194,7 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
 }
 
 /** One episode row with play / favorite / download actions. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecord>) {
   val favorites = NerLanApp.instance.favorites
@@ -256,7 +260,7 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
           tint = MaterialTheme.colorScheme.primary,
           modifier = Modifier.size(24.dp),
         )
-        progress != null -> CircularProgressIndicator(
+        progress != null -> CircularWavyProgressIndicator(
           progress = { progress },
           modifier = Modifier.size(24.dp),
         )

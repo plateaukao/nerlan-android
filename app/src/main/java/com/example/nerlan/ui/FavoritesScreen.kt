@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
 
 /** Favorited programs and episodes. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FavoritesScreen(onProgramClick: (Program) -> Unit) {
   val favorites = NerLanApp.instance.favorites
@@ -53,7 +55,7 @@ fun FavoritesScreen(onProgramClick: (Program) -> Unit) {
     item {
       Text(
         "收藏",
-        style = MaterialTheme.typography.headlineMedium,
+        style = MaterialTheme.typography.headlineMediumEmphasized,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
       )

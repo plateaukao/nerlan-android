@@ -11,9 +11,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +43,7 @@ import com.example.nerlan.data.Program
  * The full catalog loads in one request; chips derive from loaded data
  * and filter instantly client-side. Chips wrap into rows (no carousel).
  */
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
   var groups by remember { mutableStateOf<List<LanguageGroup>>(emptyList()) }
@@ -64,14 +71,14 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
 
   Box(Modifier.fillMaxSize()) {
     when {
-      isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+      isLoading -> LoadingIndicator(Modifier.align(Alignment.Center).size(56.dp))
       errorMessage != null ->
         Text("載入失敗：$errorMessage", Modifier.align(Alignment.Center).padding(24.dp))
       else -> LazyColumn(Modifier.fillMaxSize()) {
         item {
           Text(
             "語言學習",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineMediumEmphasized,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
           )
@@ -110,18 +117,13 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
 
 @Composable
 private fun LanguageChip(label: String, selected: Boolean, onClick: () -> Unit) {
-  Text(
-    label,
-    style = MaterialTheme.typography.bodyMedium,
-    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-    modifier = Modifier
-      .clip(CircleShape)
-      .background(
-        if (selected) MaterialTheme.colorScheme.primary
-        else MaterialTheme.colorScheme.surfaceVariant
-      )
-      .clickable(onClick = onClick)
-      .padding(horizontal = 12.dp, vertical = 6.dp),
+  FilterChip(
+    selected = selected,
+    onClick = onClick,
+    label = { Text(label) },
+    leadingIcon = if (selected) {
+      { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+    } else null,
   )
 }
 

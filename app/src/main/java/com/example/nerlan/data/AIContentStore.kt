@@ -84,7 +84,9 @@ class AIContentStore(private val context: Context) {
       val transcoded = File(context.cacheDir, "ai-speech-${record.id}.m4a").also { it.delete() }
       val prepared =
         if (AudioTranscoder.toMono16k(context, Uri.fromFile(source), transcoded)) transcoded else source
-      val raw = OpenAIService.transcribe(prepared, settings.transcriptionModelOrDefault(), settings.apiKey.value)
+      val raw = OpenAIService.transcribe(
+        prepared, settings.transcriptionModelOrDefault(), settings.apiKey.value,
+        prompt = OpenAIService.transcriptionPrompt(record.language))
       cleanupTemp(prepared, source)
 
       // Re-segment into one sentence per line; keep the raw transcript if that fails.

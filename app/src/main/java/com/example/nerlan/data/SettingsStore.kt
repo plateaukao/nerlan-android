@@ -53,6 +53,11 @@ class SettingsStore(context: Context) {
   companion object {
     const val DEFAULT_CHAT_MODEL = "gpt-4o"
     const val DEFAULT_TRANSCRIPTION_MODEL = "whisper-1"
+
+    /** Selectable transcription models. whisper-1 collapses bilingual audio into
+     *  the dominant language; the gpt-4o-transcribe models handle code-switching
+     *  far better (see OpenAIService.transcribe). */
+    val TRANSCRIPTION_MODELS = listOf("whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe")
     private const val KEY_API = "openai_api_key"
     private const val KEY_CHAT = "openai_chat_model"
     private const val KEY_TRANSCRIPTION = "openai_transcription_model"

@@ -12,9 +12,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -42,6 +47,7 @@ import com.example.nerlan.player.AudioCache
  * OpenAI credentials & model configuration, shown as a full-screen dialog from
  * the 節目 tab. Mirrors the iOS SettingsView.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onDismiss: () -> Unit) {
   val settings = NerLanApp.instance.settings
@@ -52,6 +58,7 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   val cacheStreamedAudio by settings.cacheStreamedAudio.collectAsState()
   var showClearConfirm by remember { mutableStateOf(false) }
   var showClearCacheConfirm by remember { mutableStateOf(false) }
+  var modelMenuExpanded by remember { mutableStateOf(false) }
   var cacheBytes by remember { mutableStateOf(AudioCache.sizeBytes(NerLanApp.instance)) }
 
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -92,13 +99,35 @@ fun SettingsScreen(onDismiss: () -> Unit) {
 
           Spacer(Modifier.height(16.dp))
           Text("模型", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 4.dp))
-          OutlinedTextField(
-            value = transcriptionModel,
-            onValueChange = settings::setTranscriptionModel,
-            singleLine = true,
-            label = { Text("轉錄模型") },
+          ExposedDropdownMenuBox(
+            expanded = modelMenuExpanded,
+            onExpandedChange = { modelMenuExpanded = it },
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-          )
+          ) {
+            OutlinedTextField(
+              value = transcriptionModel,
+              onValueChange = {},
+              readOnly = true,
+              singleLine = true,
+              label = { Text("轉錄模型") },
+              trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelMenuExpanded) },
+              modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+            )
+            ExposedDropdownMenu(
+              expanded = modelMenuExpanded,
+              onDismissRequest = { modelMenuExpanded = false },
+            ) {
+              SettingsStore.TRANSCRIPTION_MODELS.forEach { model ->
+                DropdownMenuItem(
+                  text = { Text(model) },
+                  onClick = {
+                    settings.setTranscriptionModel(model)
+                    modelMenuExpanded = false
+                  },
+                )
+              }
+            }
+          }
           OutlinedTextField(
             value = chatModel,
             onValueChange = settings::setChatModel,

@@ -41,12 +41,23 @@ object OpenAIService {
 
   // MARK: Transcription
 
-  /** Transcribe an audio file via POST /audio/transcriptions (multipart). */
-  suspend fun transcribe(file: File, model: String, apiKey: String): String = withContext(Dispatchers.IO) {
+  /**
+   * Transcribe an audio file via POST /audio/transcriptions (multipart).
+   *
+   * [prompt] biases Whisper's output script/vocabulary. These are bilingual
+   * teaching programs (Mandarin host + foreign examples); without a prompt
+   * Whisper locks onto the dominant language (Chinese) and collapses the foreign
+   * speech into Chinese characters. Priming it with Traditional Chinese plus a
+   * native-script sample of the target language keeps both intact — build one
+   * with [transcriptionPrompt].
+   */
+  suspend fun transcribe(file: File, model: String, apiKey: String, prompt: String? = null): String =
+    withContext(Dispatchers.IO) {
     if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
     val body = MultipartBody.Builder().setType(MultipartBody.FORM)
       .addFormDataPart("model", model)
       .addFormDataPart("response_format", "text")
+      .apply { if (!prompt.isNullOrBlank()) addFormDataPart("prompt", prompt) }
       .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
       .build()
     val request = Request.Builder()
@@ -59,6 +70,31 @@ object OpenAIService {
       if (!response.isSuccessful) throw OpenAIException(errorMessage(text) ?: "OpenAI 請求失敗（HTTP ${response.code}）")
       text.trim()
     }
+  }
+
+  /**
+   * A Whisper `prompt` for a program's target [language] (the Chinese name from
+   * `EpisodeRecord.language`, e.g. 日語/英語/韓語). Whisper treats the prompt as
+   * preceding context, not an instruction, so we prime it with actual mixed text:
+   * a Traditional-Chinese teaching sentence plus a short native-script sample of
+   * the language, which nudges the decoder to keep 正體中文 for the host and the
+   * original script for the foreign words.
+   */
+  fun transcriptionPrompt(language: String): String {
+    val base = "這是一段以臺灣繁體中文（正體字）講解的語言教學廣播節目，主持人會穿插示範外語。"
+    val sample = when {
+      language.contains("日") -> "日語例句：おはようございます。ありがとうございます。よろしくお願いします。"
+      language.contains("英") -> "English examples: Good morning. How are you today? Thank you very much."
+      language.contains("韓") -> "韓語例句：안녕하세요. 감사합니다. 맛있어요."
+      language.contains("法") -> "Exemples en français : Bonjour. Comment allez-vous ? Merci beaucoup."
+      language.contains("德") -> "Beispiele auf Deutsch: Guten Morgen. Wie geht es Ihnen? Danke schön."
+      language.contains("西") -> "Ejemplos en español: Buenos días. ¿Cómo está usted? Muchas gracias."
+      language.contains("越") -> "Ví dụ tiếng Việt: Xin chào. Bạn có khỏe không? Cảm ơn rất nhiều."
+      language.contains("印尼") -> "Contoh bahasa Indonesia: Selamat pagi. Apa kabar? Terima kasih banyak."
+      language.contains("泰") -> "ตัวอย่างภาษาไทย: สวัสดีครับ สบายดีไหม ขอบคุณมากครับ"
+      else -> return base + "節目中會穿插「$language」教學，請保留該語言文字的原始樣貌。"
+    }
+    return base + sample
   }
 
   // MARK: Sentence segmentation

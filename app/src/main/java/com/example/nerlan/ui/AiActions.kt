@@ -1,8 +1,12 @@
 package com.example.nerlan.ui
 
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Description
@@ -10,8 +14,9 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -22,7 +27,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.example.nerlan.NerLanApp
@@ -37,12 +44,14 @@ import com.example.nerlan.data.EpisodeRecord
  * `compact` = icon only (list rows); otherwise icon + label (full player).
  * Mirrors the iOS `AIActionButton`.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun AiActionButton(kind: AiKind, record: EpisodeRecord, compact: Boolean) {
   val ai = NerLanApp.instance.ai
   val jobs by ai.jobs.collectAsState()
+  val revision by ai.revision.collectAsState()
   val job = jobs["${kind.prefix}:${record.id}"]
-  val ready = remember(job, record.id) {
+  val ready = remember(job, revision, record.id) {
     if (kind == AiKind.TRANSCRIPT) ai.hasTranscript(record.id) else ai.hasHandout(record.id)
   }
   val running = job is AIContentStore.JobState.Running
@@ -50,6 +59,7 @@ fun AiActionButton(kind: AiKind, record: EpisodeRecord, compact: Boolean) {
 
   var pendingOpen by remember { mutableStateOf(false) }
   var showSheet by remember { mutableStateOf(false) }
+  var showMenu by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
 
   LaunchedEffect(ready) { if (ready && pendingOpen) { pendingOpen = false; showSheet = true } }
@@ -71,12 +81,37 @@ fun AiActionButton(kind: AiKind, record: EpisodeRecord, compact: Boolean) {
   }
 
   val label = if (kind == AiKind.TRANSCRIPT) "逐字稿" else "AI 講義"
-  if (compact) {
-    IconButton(onClick = onClick) { AiIcon(kind, running, ready, failureMessage != null) }
-  } else {
-    TextButton(onClick = onClick, contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)) {
-      AiIcon(kind, running, ready, failureMessage != null)
-      Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+  val onLongClick: () -> Unit = { if (ready || failureMessage != null) showMenu = true }
+  Box {
+    if (compact) {
+      Box(
+        modifier = Modifier
+          .clip(CircleShape)
+          .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+          .size(40.dp),
+        contentAlignment = Alignment.Center,
+      ) { AiIcon(kind, running, ready, failureMessage != null) }
+    } else {
+      Row(
+        modifier = Modifier
+          .clip(MaterialTheme.shapes.small)
+          .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+          .padding(horizontal = 6.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        AiIcon(kind, running, ready, failureMessage != null)
+        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+      }
+    }
+    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+      DropdownMenuItem(
+        text = { Text("重新產生") },
+        onClick = { showMenu = false; pendingOpen = false; ai.regenerate(kind, record) },
+      )
+      DropdownMenuItem(
+        text = { Text("刪除$label") },
+        onClick = { showMenu = false; ai.delete(kind, record.id) },
+      )
     }
   }
 

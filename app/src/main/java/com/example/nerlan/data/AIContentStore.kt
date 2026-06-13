@@ -38,6 +38,11 @@ class AIContentStore(private val context: Context) {
   private val _jobs = MutableStateFlow<Map<String, JobState>>(emptyMap())
   val jobs: StateFlow<Map<String, JobState>> = _jobs
 
+  /** Bumped whenever saved content changes (e.g. a delete) so the file-based
+   *  `hasTranscript`/`hasHandout` views recompose even when no job is involved. */
+  private val _revision = MutableStateFlow(0)
+  val revision: StateFlow<Int> = _revision
+
   private fun transcriptFile(id: String) = File(transcriptsDir, "$id.txt")
   private fun handoutFile(id: String) = File(handoutsDir, "$id.html")
 
@@ -68,6 +73,26 @@ class AIContentStore(private val context: Context) {
     transcriptsDir.listFiles()?.forEach { it.delete() }
     handoutsDir.listFiles()?.forEach { it.delete() }
     _jobs.value = emptyMap()
+    _revision.value += 1
+  }
+
+  /** Delete one episode's saved content of [kind]. */
+  fun delete(kind: AiKind, id: String) {
+    when (kind) {
+      AiKind.TRANSCRIPT -> transcriptFile(id).delete()
+      AiKind.HANDOUT -> handoutFile(id).delete()
+    }
+    clearJob(key(kind, id))
+    _revision.value += 1
+  }
+
+  /** Delete the saved content and immediately re-run it with current settings. */
+  fun regenerate(kind: AiKind, record: EpisodeRecord) {
+    delete(kind, record.id)
+    when (kind) {
+      AiKind.TRANSCRIPT -> processTranscript(record)
+      AiKind.HANDOUT -> processHandout(record)
+    }
   }
 
   // MARK: Work
@@ -97,7 +122,8 @@ class AIContentStore(private val context: Context) {
         cleanupChunks(chunks, source)
       }
 
-      // Re-segment into one sentence per line; keep the raw transcript if that fails.
+      // Re-segment into one sentence per line (adds sentence-ending punctuation
+      // only, never alters content); keep the raw transcript if that fails.
       setJob(k, JobState.Running("整理句子中…"))
       val text = runCatching {
         OpenAIService.segmentTranscript(raw, settings.chatModelOrDefault(), settings.apiKey.value)

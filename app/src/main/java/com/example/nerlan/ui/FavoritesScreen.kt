@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.nerlan.NerLanApp
+import com.example.nerlan.data.AiKind
 import com.example.nerlan.data.EpisodeRecord
 import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
@@ -96,6 +97,7 @@ fun SectionHeader(title: String) {
 fun RecordRow(record: EpisodeRecord, queue: List<EpisodeRecord>, onDelete: () -> Unit) {
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
+  val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
   val isCurrent = current?.id == record.id
   var showAttachment by remember { mutableStateOf(false) }
 
@@ -134,6 +136,10 @@ fun RecordRow(record: EpisodeRecord, queue: List<EpisodeRecord>, onDelete: () ->
         Icon(Icons.Filled.Info, contentDescription = "講義",
           tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
       }
+    }
+    if (apiKey.isNotBlank()) {
+      AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
+      AiActionButton(AiKind.HANDOUT, record, compact = true)
     }
     IconButton(onClick = onDelete) {
       Icon(Icons.Filled.Delete, contentDescription = "移除",

@@ -86,6 +86,8 @@ dependencies {
   // Media playback
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.session)
+  // Audio transcode (shrink episodes for OpenAI's 25 MB upload cap)
+  implementation(libs.androidx.media3.transformer)
 
   // Networking / JSON / images
   implementation(libs.okhttp)

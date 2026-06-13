@@ -51,6 +51,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.nerlan.NerLanApp
+import com.example.nerlan.data.AiKind
 import com.example.nerlan.player.PlayerManager
 
 /** Full player sheet with transport, speed, favorite and download controls. */
@@ -59,6 +60,7 @@ import com.example.nerlan.player.PlayerManager
 fun PlayerSheet(onDismiss: () -> Unit) {
   val favorites = NerLanApp.instance.favorites
   val downloads = NerLanApp.instance.downloads
+  val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
   val positionMs by PlayerManager.positionMs.collectAsState()
@@ -246,6 +248,18 @@ fun PlayerSheet(onDismiss: () -> Unit) {
             Icon(Icons.Filled.ArrowDownward, contentDescription = null, modifier = Modifier.size(20.dp))
             Text("下載", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
           }
+        }
+      }
+
+      // AI tools (transcript / handout) — only once an API key is set.
+      if (apiKey.isNotBlank()) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
+          modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+        ) {
+          AiActionButton(AiKind.TRANSCRIPT, record, compact = false)
+          AiActionButton(AiKind.HANDOUT, record, compact = false)
         }
       }
 

@@ -16,10 +16,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -50,6 +52,7 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
   var selectedLanguage by remember { mutableStateOf<String?>(null) }
   var isLoading by remember { mutableStateOf(true) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
+  var showSettings by remember { mutableStateOf(false) }
 
   LaunchedEffect(Unit) {
     if (groups.isEmpty()) {
@@ -76,12 +79,20 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
         Text("載入失敗：$errorMessage", Modifier.align(Alignment.Center).padding(24.dp))
       else -> LazyColumn(Modifier.fillMaxSize()) {
         item {
-          Text(
-            "語言學習",
-            style = MaterialTheme.typography.headlineMediumEmphasized,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 8.dp),
-          )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 16.dp, bottom = 8.dp),
+          ) {
+            Text(
+              "語言學習",
+              style = MaterialTheme.typography.headlineMediumEmphasized,
+              fontWeight = FontWeight.Bold,
+              modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = { showSettings = true }) {
+              Icon(Icons.Filled.Settings, contentDescription = "設定")
+            }
+          }
         }
         item {
           FlowRow(
@@ -112,6 +123,10 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
         }
       }
     }
+  }
+
+  if (showSettings) {
+    SettingsScreen(onDismiss = { showSettings = false })
   }
 }
 

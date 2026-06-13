@@ -81,13 +81,21 @@ class AIContentStore(private val context: Context) {
     return try {
       val source = audioFile(record) ?: throw Exception("找不到音訊檔")
       setJob(k, JobState.Running("轉錄中…"))
-      val transcoded = File(context.cacheDir, "ai-speech-${record.id}.m4a").also { it.delete() }
-      val prepared =
-        if (AudioTranscoder.toMono16k(context, Uri.fromFile(source), transcoded)) transcoded else source
-      val raw = OpenAIService.transcribe(
-        prepared, settings.transcriptionModelOrDefault(), settings.apiKey.value,
-        prompt = OpenAIService.transcriptionPrompt(record.language))
-      cleanupTemp(prepared, source)
+      // Long episodes are split into chunks (the gpt-4o-transcribe models cap
+      // input at 1400 s); transcribe each and join.
+      val chunks = AudioTranscoder.transcodeChunks(context, record.id, Uri.fromFile(source), source)
+      val prompt = OpenAIService.transcriptionPrompt(record.language)
+      val raw = try {
+        val parts = mutableListOf<String>()
+        for ((i, chunk) in chunks.withIndex()) {
+          if (chunks.size > 1) setJob(k, JobState.Running("轉錄中…（${i + 1}/${chunks.size}）"))
+          parts += OpenAIService.transcribe(
+            chunk, settings.transcriptionModelOrDefault(), settings.apiKey.value, prompt = prompt)
+        }
+        parts.joinToString("\n")
+      } finally {
+        cleanupChunks(chunks, source)
+      }
 
       // Re-segment into one sentence per line; keep the raw transcript if that fails.
       setJob(k, JobState.Running("整理句子中…"))
@@ -137,10 +145,10 @@ class AIContentStore(private val context: Context) {
     return tmp
   }
 
-  /** Delete the transcoded temp and any audio we downloaded to cache, keeping offline downloads. */
-  private fun cleanupTemp(prepared: File, source: File) {
+  /** Delete the transcoded chunk temps and any audio we downloaded to cache, keeping offline downloads. */
+  private fun cleanupChunks(chunks: List<File>, source: File) {
     val cache = context.cacheDir
-    if (prepared != source && prepared.parentFile == cache) prepared.delete()
+    chunks.forEach { if (it != source && it.parentFile == cache) it.delete() }
     if (source.parentFile == cache) source.delete()
   }
 }

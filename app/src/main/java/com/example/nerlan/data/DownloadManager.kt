@@ -1,6 +1,7 @@
 package com.example.nerlan.data
 
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,12 +14,17 @@ import okhttp3.Request
 /**
  * Downloads episode MP3s for offline playback into filesDir/audio/{episodeId}.mp3.
  * Channel+ serves direct audio files, so a plain streaming copy suffices.
+ * Episode attachments (PDF handouts) ride along into filesDir/attachments/.
  */
 class DownloadManager(filesDir: File) {
   private val recordsFile = File(filesDir, "downloads.json")
   private val audioDir = File(filesDir, "audio").apply { mkdirs() }
+  private val attachmentsDir = File(filesDir, "attachments").apply { mkdirs() }
   private val json = Json { ignoreUnknownKeys = true }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+  /** attachmentKeys currently being fetched, to avoid duplicate concurrent downloads. */
+  private val attachmentsInFlight = ConcurrentHashMap.newKeySet<String>()
 
   private val _records = MutableStateFlow(
     runCatching { json.decodeFromString<List<EpisodeRecord>>(recordsFile.readText()) }
@@ -32,6 +38,9 @@ class DownloadManager(filesDir: File) {
 
   private fun fileFor(episodeId: String) = File(audioDir, "$episodeId.mp3")
 
+  private fun attachmentFileFor(attachment: Attachment) =
+    File(attachmentsDir, "${attachment.attachmentKey}.${attachment.fileExtension}")
+
   fun isDownloaded(episodeId: String) = fileFor(episodeId).exists()
 
   fun isDownloading(episodeId: String) = _progress.value.containsKey(episodeId)
@@ -39,7 +48,16 @@ class DownloadManager(filesDir: File) {
   fun localPath(episodeId: String): String? =
     fileFor(episodeId).takeIf { it.exists() }?.absolutePath
 
+  /** Local copy of an attachment, if it has been downloaded. */
+  fun localAttachmentPath(attachment: Attachment): String? =
+    attachmentFileFor(attachment).takeIf { it.exists() }?.absolutePath
+
   fun download(record: EpisodeRecord) {
+    downloadAudio(record)
+    record.attachments.orEmpty().forEach { downloadAttachment(it) }
+  }
+
+  private fun downloadAudio(record: EpisodeRecord) {
     val url = record.audio ?: return
     if (isDownloaded(record.id) || isDownloading(record.id)) return
     _progress.value += (record.id to 0f)
@@ -81,8 +99,37 @@ class DownloadManager(filesDir: File) {
     }
   }
 
+  /**
+   * Fetch an attachment for offline use (no progress UI — handouts are small and
+   * ride along with the audio download). Skips files already present or in flight.
+   */
+  private fun downloadAttachment(attachment: Attachment) {
+    val url = attachment.remoteUrl ?: return
+    val dest = attachmentFileFor(attachment)
+    if (dest.exists() || !attachmentsInFlight.add(attachment.attachmentKey)) return
+    scope.launch {
+      val tmp = File(dest.path + ".part")
+      try {
+        val request = Request.Builder().url(url).build()
+        ChannelPlusApi.client.newCall(request).execute().use { response ->
+          if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+          val body = response.body ?: throw Exception("empty body")
+          body.byteStream().use { input -> tmp.outputStream().use { output -> input.copyTo(output) } }
+        }
+        tmp.renameTo(dest)
+      } catch (_: Exception) {
+        tmp.delete()
+      } finally {
+        attachmentsInFlight.remove(attachment.attachmentKey)
+      }
+    }
+  }
+
   fun delete(episodeId: String) {
     fileFor(episodeId).delete()
+    _records.value.firstOrNull { it.id == episodeId }?.attachments.orEmpty().forEach {
+      attachmentFileFor(it).delete()
+    }
     _records.value = _records.value.filterNot { it.id == episodeId }
     recordsFile.writeText(json.encodeToString(_records.value))
   }

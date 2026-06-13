@@ -33,6 +33,28 @@ data class ImageRef(val imageRef: String? = null)
 @Serializable
 data class VoiceRef(val voiceRef: String? = null)
 
+/** A downloadable file attached to an episode — typically a PDF handout (講義). */
+@Serializable
+data class Attachment(
+  val originalName: String? = null,
+  val fileType: String? = null,
+  val attachmentKey: String,
+) {
+  val displayName: String get() = originalName ?: "附件"
+
+  /** File extension to store/open the attachment with (defaults to pdf). */
+  val fileExtension: String
+    get() {
+      fileType?.takeIf { it.isNotEmpty() }?.let { return it.lowercase() }
+      originalName?.takeIf { it.contains(".") }?.substringAfterLast(".")
+        ?.takeIf { it.isNotEmpty() }?.let { return it.lowercase() }
+      return "pdf"
+    }
+
+  val isPdf: Boolean get() = fileExtension == "pdf"
+  val remoteUrl: String? get() = ChannelPlusApi.fileUrl(attachmentKey)
+}
+
 @Serializable
 data class LanguageTags(
   val contentLanguage: List<Tag>? = null,
@@ -76,6 +98,7 @@ data class Episode(
   val releaseDate: String? = null,
   val voice: VoiceRef? = null,
   val image: ImageRef? = null,
+  val attachments: List<Attachment>? = null,
 ) {
   val displayTitle: String get() = title ?: "（無標題）"
   val audioUrl: String? get() = ChannelPlusApi.audioUrl(voice?.voiceRef)
@@ -104,7 +127,11 @@ data class EpisodeRecord(
   val programName: String,
   val language: String,
   val coverUrl: String? = null,
+  val attachments: List<Attachment>? = null,   // optional: records saved before this field decode fine
 ) {
+  /** PDF attachments, the only kind we can render inline. */
+  val pdfAttachments: List<Attachment> get() = attachments.orEmpty().filter { it.isPdf }
+
   companion object {
     fun from(episode: Episode, program: Program) = EpisodeRecord(
       id = episode.episodeId,
@@ -115,6 +142,7 @@ data class EpisodeRecord(
       programName = program.name,
       language = program.language,
       coverUrl = ChannelPlusApi.imageUrl(episode.image?.imageRef) ?: program.coverUrl,
+      attachments = episode.attachments,
     )
   }
 }

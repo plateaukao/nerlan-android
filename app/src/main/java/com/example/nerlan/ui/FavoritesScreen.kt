@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -21,6 +22,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -93,6 +97,7 @@ fun RecordRow(record: EpisodeRecord, queue: List<EpisodeRecord>, onDelete: () ->
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
   val isCurrent = current?.id == record.id
+  var showAttachment by remember { mutableStateOf(false) }
 
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -124,9 +129,23 @@ fun RecordRow(record: EpisodeRecord, queue: List<EpisodeRecord>, onDelete: () ->
       tint = MaterialTheme.colorScheme.primary,
       modifier = Modifier.size(20.dp),
     )
+    if (record.pdfAttachments.isNotEmpty()) {
+      IconButton(onClick = { showAttachment = true }) {
+        Icon(Icons.Filled.Info, contentDescription = "講義",
+          tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+      }
+    }
     IconButton(onClick = onDelete) {
       Icon(Icons.Filled.Delete, contentDescription = "移除",
         tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
     }
+  }
+
+  if (showAttachment) {
+    AttachmentViewer(
+      title = record.title,
+      attachments = record.pdfAttachments,
+      onDismiss = { showAttachment = false },
+    )
   }
 }

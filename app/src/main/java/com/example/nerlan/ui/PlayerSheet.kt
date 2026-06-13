@@ -1,7 +1,9 @@
 package com.example.nerlan.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -71,6 +74,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   var isScrubbing by remember { mutableStateOf(false) }
   var scrubPosition by remember { mutableFloatStateOf(0f) }
   var speedMenuOpen by remember { mutableStateOf(false) }
+  var showAttachment by remember { mutableStateOf(false) }
 
   // Open fully expanded so transport controls aren't cropped at half height.
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -161,11 +165,14 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         }
       }
 
-      // Speed / repeat / favorite / download
+      // Repeat / speed / favorite / handout / download. Spread evenly across the
+      // full width with compact button padding so all five fit one line.
+      val controlPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
+      val controlLabel = MaterialTheme.typography.labelMedium
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp),
       ) {
         IconButton(onClick = { PlayerManager.cycleRepeatMode() }) {
           Icon(
@@ -183,10 +190,10 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           )
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-          TextButton(onClick = { speedMenuOpen = true }) {
+        Box {
+          TextButton(onClick = { speedMenuOpen = true }, contentPadding = controlPadding) {
             Icon(Icons.Filled.Speed, contentDescription = null, modifier = Modifier.size(20.dp))
-            Text(rateLabel(rate), modifier = Modifier.padding(start = 4.dp))
+            Text(rateLabel(rate), style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
           }
           DropdownMenu(expanded = speedMenuOpen, onDismissRequest = { speedMenuOpen = false }) {
             PlayerManager.AVAILABLE_RATES.forEach { r ->
@@ -202,34 +209,52 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         }
 
         val isFav = favEpisodes.any { it.id == record.id }
-        TextButton(onClick = { favorites.toggle(record) }) {
+        TextButton(onClick = { favorites.toggle(record) }, contentPadding = controlPadding) {
           Icon(
             if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.error,
             modifier = Modifier.size(20.dp),
           )
-          Text("收藏", modifier = Modifier.padding(start = 4.dp))
+          Text("收藏", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+        }
+
+        if (record.pdfAttachments.isNotEmpty()) {
+          TextButton(onClick = { showAttachment = true }, contentPadding = controlPadding) {
+            Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text("講義", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+          }
         }
 
         val isDownloaded = downloadRecords.any { it.id == record.id } || downloads.isDownloaded(record.id)
         val progress = progressMap[record.id]
         when {
-          isDownloaded -> Row(verticalAlignment = Alignment.CenterVertically) {
+          isDownloaded -> Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 6.dp),
+          ) {
             Icon(
               Icons.Filled.CheckCircle,
               contentDescription = null,
               tint = MaterialTheme.colorScheme.primary,
               modifier = Modifier.size(20.dp),
             )
-            Text("已下載", modifier = Modifier.padding(start = 4.dp))
+            Text("已下載", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
           }
           progress != null -> CircularWavyProgressIndicator(progress = { progress }, modifier = Modifier.size(24.dp))
-          else -> TextButton(onClick = { downloads.download(record) }) {
+          else -> TextButton(onClick = { downloads.download(record) }, contentPadding = controlPadding) {
             Icon(Icons.Filled.ArrowDownward, contentDescription = null, modifier = Modifier.size(20.dp))
-            Text("下載", modifier = Modifier.padding(start = 4.dp))
+            Text("下載", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
           }
         }
+      }
+
+      if (showAttachment) {
+        AttachmentViewer(
+          title = record.title,
+          attachments = record.pdfAttachments,
+          onDismiss = { showAttachment = false },
+        )
       }
     }
   }

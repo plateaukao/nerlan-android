@@ -27,6 +27,10 @@ object ChannelPlusApi {
   fun imageUrl(imageRef: String?): String? =
     imageRef?.takeIf { it.isNotEmpty() }?.let { "$BASE/image?key=$it" }
 
+  /** Episode attachments (PDF handouts etc.) are served from `file?key=`. */
+  fun fileUrl(attachmentKey: String?): String? =
+    attachmentKey?.takeIf { it.isNotEmpty() }?.let { "$BASE/file?key=$it" }
+
   private suspend fun fetch(pathAndQuery: String): String = withContext(Dispatchers.IO) {
     val request = Request.Builder()
       .url("$BASE/$pathAndQuery")

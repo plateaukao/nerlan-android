@@ -21,6 +21,11 @@ class SettingsStore(context: Context) {
     MutableStateFlow(prefs.getString(KEY_TRANSCRIPTION, DEFAULT_TRANSCRIPTION_MODEL)!!)
   val transcriptionModel: StateFlow<String> = _transcriptionModel
 
+  /** When on, an episode streamed to completion is cached for offline replay.
+   *  Off by default so it never silently uses data or storage unasked. */
+  private val _cacheStreamedAudio = MutableStateFlow(prefs.getBoolean(KEY_CACHE_STREAM, false))
+  val cacheStreamedAudio: StateFlow<Boolean> = _cacheStreamedAudio
+
   fun setApiKey(value: String) {
     _apiKey.value = value
     prefs.edit().putString(KEY_API, value).apply()
@@ -36,6 +41,11 @@ class SettingsStore(context: Context) {
     prefs.edit().putString(KEY_TRANSCRIPTION, value).apply()
   }
 
+  fun setCacheStreamedAudio(value: Boolean) {
+    _cacheStreamedAudio.value = value
+    prefs.edit().putBoolean(KEY_CACHE_STREAM, value).apply()
+  }
+
   /** Model names coerced away from blank for actual API calls. */
   fun chatModelOrDefault() = _chatModel.value.ifBlank { DEFAULT_CHAT_MODEL }
   fun transcriptionModelOrDefault() = _transcriptionModel.value.ifBlank { DEFAULT_TRANSCRIPTION_MODEL }
@@ -46,5 +56,6 @@ class SettingsStore(context: Context) {
     private const val KEY_API = "openai_api_key"
     private const val KEY_CHAT = "openai_chat_model"
     private const val KEY_TRANSCRIPTION = "openai_transcription_model"
+    private const val KEY_CACHE_STREAM = "cache_streamed_audio"
   }
 }

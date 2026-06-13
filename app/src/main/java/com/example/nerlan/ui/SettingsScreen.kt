@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,8 +33,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import android.text.format.Formatter
 import com.example.nerlan.NerLanApp
 import com.example.nerlan.data.SettingsStore
+import com.example.nerlan.player.AudioCache
 
 /**
  * OpenAI credentials & model configuration, shown as a full-screen dialog from
@@ -46,7 +49,10 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   val apiKey by settings.apiKey.collectAsState()
   val chatModel by settings.chatModel.collectAsState()
   val transcriptionModel by settings.transcriptionModel.collectAsState()
+  val cacheStreamedAudio by settings.cacheStreamedAudio.collectAsState()
   var showClearConfirm by remember { mutableStateOf(false) }
+  var showClearCacheConfirm by remember { mutableStateOf(false) }
+  var cacheBytes by remember { mutableStateOf(AudioCache.sizeBytes(NerLanApp.instance)) }
 
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
     Surface(Modifier.fillMaxSize()) {
@@ -106,6 +112,31 @@ fun SettingsScreen(onDismiss: () -> Unit) {
           }) { Text("恢復預設模型") }
 
           Spacer(Modifier.height(16.dp))
+          Text("串流快取", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 4.dp))
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text("串流時自動快取", modifier = Modifier.weight(1f))
+            Switch(checked = cacheStreamedAudio, onCheckedChange = settings::setCacheStreamedAudio)
+          }
+          Text(
+            buildString {
+              append("開啟後，串流播放過的音檔會自動保存，下次播放免再下載（不會顯示在「下載」分頁）。")
+              if (cacheBytes > 0) {
+                append("目前已快取 ${Formatter.formatShortFileSize(NerLanApp.instance, cacheBytes)}。")
+              }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+          )
+          TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheBytes > 0) {
+            Text("清除快取音檔", color = MaterialTheme.colorScheme.error)
+          }
+
+          Spacer(Modifier.height(16.dp))
           TextButton(onClick = { showClearConfirm = true }) {
             Text("清除所有 AI 內容", color = MaterialTheme.colorScheme.error)
           }
@@ -128,6 +159,22 @@ fun SettingsScreen(onDismiss: () -> Unit) {
         TextButton(onClick = { ai.clearAll(); showClearConfirm = false }) { Text("清除") }
       },
       dismissButton = { TextButton(onClick = { showClearConfirm = false }) { Text("取消") } },
+    )
+  }
+
+  if (showClearCacheConfirm) {
+    AlertDialog(
+      onDismissRequest = { showClearCacheConfirm = false },
+      title = { Text("清除快取音檔？") },
+      text = { Text("刪除串流時自動保存的音檔。") },
+      confirmButton = {
+        TextButton(onClick = {
+          AudioCache.clear(NerLanApp.instance)
+          cacheBytes = 0
+          showClearCacheConfirm = false
+        }) { Text("清除") }
+      },
+      dismissButton = { TextButton(onClick = { showClearCacheConfirm = false }) { Text("取消") } },
     )
   }
 }

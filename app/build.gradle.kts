@@ -86,6 +86,8 @@ dependencies {
   // Media playback
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.session)
+  // CacheDataSource/SimpleCache for opt-in caching of streamed audio
+  implementation(libs.androidx.media3.datasource)
   // Audio transcode (shrink episodes for OpenAI's 25 MB upload cap)
   implementation(libs.androidx.media3.transformer)
 

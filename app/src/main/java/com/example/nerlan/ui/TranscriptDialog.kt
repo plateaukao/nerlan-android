@@ -47,7 +47,12 @@ fun TranscriptDialog(title: String, text: String, onDismiss: () -> Unit) {
 
 /** The transcript body, shared by the phone dialog and the large-screen panel. */
 @Composable
-fun TranscriptContent(title: String, text: String, onClose: () -> Unit) {
+fun TranscriptContent(
+  title: String,
+  text: String,
+  onClose: () -> Unit,
+  leading: @Composable () -> Unit = {},
+) {
   val sentences = remember(text) {
     text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
   }
@@ -58,6 +63,7 @@ fun TranscriptContent(title: String, text: String, onClose: () -> Unit) {
       verticalAlignment = Alignment.CenterVertically,
       modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
     ) {
+      leading()
       IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "關閉") }
       Text(
         title,

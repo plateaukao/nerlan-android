@@ -5,12 +5,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -59,6 +62,7 @@ fun MainScreen() {
   var programsDetail by remember { mutableStateOf<Program?>(null) }
   var favoritesDetail by remember { mutableStateOf<Program?>(null) }
   var showPlayerSheet by remember { mutableStateOf(false) }
+  var leftCollapsed by remember { mutableStateOf(false) }
   val current by PlayerManager.current.collectAsState()
   val panel = remember { StudyPanelController() }
 
@@ -114,18 +118,29 @@ fun MainScreen() {
   }
 
   BoxWithConstraints(Modifier.fillMaxSize()) {
-    // 600dp is the conventional Android tablet breakpoint; at/above it we show
-    // the iPad-style browser + detail two-pane (covers 7"+ tablets in portrait).
-    val twoPane = maxWidth >= 600.dp
+    // 800dp threshold so the detail pane has room; below it (e.g. tablet
+    // portrait) we use the single-pane phone layout.
+    val twoPane = maxWidth >= 800.dp
     CompositionLocalProvider(LocalStudyPanel provides (if (twoPane) panel else null)) {
       if (twoPane) {
         // When a new episode starts, default the panel to its study content
         // (PDF handout, else AI handout, else transcript).
         LaunchedEffect(current) { panel.item = current?.let { defaultStudyItem(it) } }
         Row(Modifier.fillMaxSize()) {
-          Box(Modifier.width(380.dp).fillMaxHeight()) { browser() }
-          VerticalDivider()
-          Box(Modifier.weight(1f).fillMaxHeight()) { StudyDetailPanel(panel) }
+          if (!leftCollapsed) {
+            Box(Modifier.width(380.dp).fillMaxHeight()) { browser() }
+            VerticalDivider()
+          }
+          // The browser pane gets insets from its Scaffold; the detail pane is
+          // raw, so inset it from the status/navigation bars here.
+          Box(Modifier.weight(1f).fillMaxHeight().windowInsetsPadding(WindowInsets.systemBars)) {
+            // Always offer the hide/show-browser toggle in two-pane mode.
+            StudyDetailPanel(
+              panel,
+              leftCollapsed = leftCollapsed,
+              onToggleLeft = { leftCollapsed = !leftCollapsed },
+            )
+          }
         }
       } else {
         browser()

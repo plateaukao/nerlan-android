@@ -41,7 +41,12 @@ fun HandoutDialog(title: String, fragment: String, onDismiss: () -> Unit) {
 
 /** The handout body, shared by the phone dialog and the large-screen panel. */
 @Composable
-fun HandoutContent(title: String, fragment: String, onClose: () -> Unit) {
+fun HandoutContent(
+  title: String,
+  fragment: String,
+  onClose: () -> Unit,
+  leading: @Composable () -> Unit = {},
+) {
   val dark = isSystemInDarkTheme()
   val html = remember(fragment, title, dark) { handoutDocument(fragment, title, dark) }
 
@@ -50,6 +55,7 @@ fun HandoutContent(title: String, fragment: String, onClose: () -> Unit) {
       verticalAlignment = Alignment.CenterVertically,
       modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
     ) {
+      leading()
       IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "關閉") }
       Text(
         title,
@@ -64,6 +70,10 @@ fun HandoutContent(title: String, fragment: String, onClose: () -> Unit) {
       factory = { ctx ->
         WebView(ctx).apply {
           settings.javaScriptEnabled = false
+          // Allow pinch-to-zoom (hide the on-screen +/- controls).
+          settings.setSupportZoom(true)
+          settings.builtInZoomControls = true
+          settings.displayZoomControls = false
           setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
       },

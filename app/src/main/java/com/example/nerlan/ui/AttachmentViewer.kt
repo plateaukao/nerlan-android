@@ -74,7 +74,12 @@ fun AttachmentViewer(title: String, attachments: List<Attachment>, onDismiss: ()
 
 /** The PDF reader body, shared by the phone dialog and the large-screen panel. */
 @Composable
-fun AttachmentContent(title: String, attachments: List<Attachment>, onClose: () -> Unit) {
+fun AttachmentContent(
+  title: String,
+  attachments: List<Attachment>,
+  onClose: () -> Unit,
+  leading: @Composable () -> Unit = {},
+) {
   Column(Modifier.fillMaxSize()) {
     var selected by remember(attachments) { mutableStateOf(attachments.firstOrNull()) }
     var switcherOpen by remember { mutableStateOf(false) }
@@ -83,6 +88,7 @@ fun AttachmentContent(title: String, attachments: List<Attachment>, onClose: () 
       verticalAlignment = Alignment.CenterVertically,
       modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
     ) {
+      leading()
       IconButton(onClick = onClose) {
         Icon(Icons.Filled.Close, contentDescription = "關閉")
       }

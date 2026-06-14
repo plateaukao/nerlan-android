@@ -110,9 +110,13 @@ class DriveSync(private val context: Context) {
       programsFile.writeText(json.encodeToString(merged)); json.encodeToString(merged)
     }
     pushed += syncMetadata(token, remote, "ai-index.json") { remoteBytes ->
-      val local = readMap(indexFile)
-      val merged = ((decodeMap(remoteBytes)) + local).toSortedMap()
-      indexFile.parentFile?.mkdirs(); indexFile.writeText(json.encodeToString(merged)); json.encodeToString(merged)
+      // toMap() keeps a plain LinkedHashMap — serializing a TreeMap (toSortedMap)
+      // throws "Serializer for class 'TreeMap' is not found".
+      val merged: Map<String, EpisodeRecord> =
+        (decodeMap(remoteBytes) + readMap(indexFile)).toList().sortedBy { it.first }.toMap()
+      indexFile.parentFile?.mkdirs()
+      indexFile.writeText(json.encodeToString(merged))
+      json.encodeToString(merged)
     }
 
     // Content files (write-once): push local-only up, pull remote-only down.

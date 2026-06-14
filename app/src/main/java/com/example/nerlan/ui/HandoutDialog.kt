@@ -32,38 +32,44 @@ import androidx.compose.ui.window.DialogProperties
  */
 @Composable
 fun HandoutDialog(title: String, fragment: String, onDismiss: () -> Unit) {
+  Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Surface(Modifier.fillMaxSize()) {
+      HandoutContent(title, fragment, onDismiss)
+    }
+  }
+}
+
+/** The handout body, shared by the phone dialog and the large-screen panel. */
+@Composable
+fun HandoutContent(title: String, fragment: String, onClose: () -> Unit) {
   val dark = isSystemInDarkTheme()
   val html = remember(fragment, title, dark) { handoutDocument(fragment, title, dark) }
 
-  Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-    Surface(Modifier.fillMaxSize()) {
-      Column(Modifier.fillMaxSize()) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-        ) {
-          IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "關閉") }
-          Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-          )
-        }
-        AndroidView(
-          factory = { ctx ->
-            WebView(ctx).apply {
-              settings.javaScriptEnabled = false
-              setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            }
-          },
-          update = { it.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null) },
-          modifier = Modifier.fillMaxSize(),
-        )
-      }
+  Column(Modifier.fillMaxSize()) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+    ) {
+      IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "關閉") }
+      Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+      )
     }
+    AndroidView(
+      factory = { ctx ->
+        WebView(ctx).apply {
+          settings.javaScriptEnabled = false
+          setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        }
+      },
+      update = { it.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null) },
+      modifier = Modifier.fillMaxSize(),
+    )
   }
 }
 

@@ -26,6 +26,11 @@ class SettingsStore(context: Context) {
   private val _cacheStreamedAudio = MutableStateFlow(prefs.getBoolean(KEY_CACHE_STREAM, false))
   val cacheStreamedAudio: StateFlow<Boolean> = _cacheStreamedAudio
 
+  /** When on (and signed in), favorites and AI content sync to the user's Google
+   *  Drive appDataFolder. Off by default. */
+  private val _syncToDrive = MutableStateFlow(prefs.getBoolean(KEY_SYNC_DRIVE, false))
+  val syncToDrive: StateFlow<Boolean> = _syncToDrive
+
   fun setApiKey(value: String) {
     _apiKey.value = value
     prefs.edit().putString(KEY_API, value).apply()
@@ -46,6 +51,11 @@ class SettingsStore(context: Context) {
     prefs.edit().putBoolean(KEY_CACHE_STREAM, value).apply()
   }
 
+  fun setSyncToDrive(value: Boolean) {
+    _syncToDrive.value = value
+    prefs.edit().putBoolean(KEY_SYNC_DRIVE, value).apply()
+  }
+
   /** Model names coerced away from blank for actual API calls. */
   fun chatModelOrDefault() = _chatModel.value.ifBlank { DEFAULT_CHAT_MODEL }
   fun transcriptionModelOrDefault() = _transcriptionModel.value.ifBlank { DEFAULT_TRANSCRIPTION_MODEL }
@@ -62,5 +72,6 @@ class SettingsStore(context: Context) {
     private const val KEY_CHAT = "openai_chat_model"
     private const val KEY_TRANSCRIPTION = "openai_transcription_model"
     private const val KEY_CACHE_STREAM = "cache_streamed_audio"
+    private const val KEY_SYNC_DRIVE = "sync_to_drive"
   }
 }

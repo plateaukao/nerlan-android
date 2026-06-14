@@ -95,4 +95,7 @@ dependencies {
   implementation(libs.okhttp)
   implementation(libs.kotlinx.serialization.json)
   implementation(libs.coil.compose)
+
+  // Google sign-in + Drive appDataFolder sync (REST over OkHttp)
+  implementation(libs.play.services.auth)
 }

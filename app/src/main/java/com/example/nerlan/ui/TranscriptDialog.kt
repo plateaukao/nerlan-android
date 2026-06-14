@@ -38,56 +38,62 @@ import androidx.compose.ui.window.DialogProperties
  */
 @Composable
 fun TranscriptDialog(title: String, text: String, onDismiss: () -> Unit) {
+  Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Surface(Modifier.fillMaxSize()) {
+      TranscriptContent(title, text, onDismiss)
+    }
+  }
+}
+
+/** The transcript body, shared by the phone dialog and the large-screen panel. */
+@Composable
+fun TranscriptContent(title: String, text: String, onClose: () -> Unit) {
   val sentences = remember(text) {
     text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
   }
   val clipboard = LocalClipboardManager.current
 
-  Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-    Surface(Modifier.fillMaxSize()) {
-      Column(Modifier.fillMaxSize()) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-        ) {
-          IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "關閉") }
-          Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-          )
-          if (sentences.isNotEmpty()) {
-            IconButton(onClick = { clipboard.setText(AnnotatedString(sentences.joinToString("\n"))) }) {
-              Icon(Icons.Filled.ContentCopy, contentDescription = "複製全部")
-            }
-          }
+  Column(Modifier.fillMaxSize()) {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+    ) {
+      IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "關閉") }
+      Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+      )
+      if (sentences.isNotEmpty()) {
+        IconButton(onClick = { clipboard.setText(AnnotatedString(sentences.joinToString("\n"))) }) {
+          Icon(Icons.Filled.ContentCopy, contentDescription = "複製全部")
         }
+      }
+    }
 
-        if (sentences.isEmpty()) {
-          Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("沒有逐字稿內容", color = MaterialTheme.colorScheme.onSurfaceVariant)
-          }
-        } else {
-          SelectionContainer {
-            LazyColumn(Modifier.fillMaxSize()) {
-              items(sentences.size) { i ->
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                  Text(
-                    "${i + 1}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(28.dp),
-                  )
-                  Text(
-                    sentences[i],
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f).padding(start = 8.dp),
-                  )
-                }
-              }
+    if (sentences.isEmpty()) {
+      Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("沒有逐字稿內容", color = MaterialTheme.colorScheme.onSurfaceVariant)
+      }
+    } else {
+      SelectionContainer {
+        LazyColumn(Modifier.fillMaxSize()) {
+          items(sentences.size) { i ->
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+              Text(
+                "${i + 1}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.width(28.dp),
+              )
+              Text(
+                sentences[i],
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f).padding(start = 8.dp),
+              )
             }
           }
         }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import okhttp3.Request
 
 /** Which AI artifact an action refers to; the prefix keys the job map. */
@@ -32,11 +33,24 @@ class AIContentStore(private val context: Context) {
 
   private val transcriptsDir = File(context.filesDir, "ai/transcripts").apply { mkdirs() }
   private val handoutsDir = File(context.filesDir, "ai/handouts").apply { mkdirs() }
+  private val indexFile = File(context.filesDir, "ai/index.json")
+  private val json = Json { ignoreUnknownKeys = true }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
   /** Keyed "transcript:{id}" / "handout:{id}"; absence means idle. */
   private val _jobs = MutableStateFlow<Map<String, JobState>>(emptyMap())
   val jobs: StateFlow<Map<String, JobState>> = _jobs
+
+  /** episode id -> record, for every episode that has a transcript or handout.
+   *  Powers the AI tab and supplies metadata for sync; backfilled from
+   *  downloads/favorites for content generated before the index existed.
+   *  Mirrors the iOS AIContentStore.records. */
+  private val _records = MutableStateFlow<Map<String, EpisodeRecord>>(emptyMap())
+  val records: StateFlow<Map<String, EpisodeRecord>> = _records
+
+  init {
+    _records.value = loadAndBackfillIndex()
+  }
 
   /** Bumped whenever saved content changes (e.g. a delete) so the file-based
    *  `hasTranscript`/`hasHandout` views recompose even when no job is involved. */
@@ -55,6 +69,50 @@ class AIContentStore(private val context: Context) {
   private fun setJob(key: String, state: JobState) = _jobs.update { it + (key to state) }
   private fun clearJob(key: String) = _jobs.update { it - key }
 
+  // MARK: Record index
+
+  /** Records of episodes that currently have a transcript or handout. */
+  fun recordsWithContent(): List<EpisodeRecord> =
+    _records.value.values.filter { hasTranscript(it.id) || hasHandout(it.id) }
+
+  /** Re-read the index and bump revision; used after a Drive pull brings in new
+   *  records and content files. */
+  fun reloadIndex() {
+    _records.value = loadAndBackfillIndex()
+    _revision.value += 1
+  }
+
+  private fun ids(): Set<String> = buildSet {
+    transcriptsDir.listFiles()?.forEach { add(it.nameWithoutExtension) }
+    handoutsDir.listFiles()?.forEach { add(it.nameWithoutExtension) }
+  }
+
+  private fun loadAndBackfillIndex(): Map<String, EpisodeRecord> {
+    val loaded = runCatching {
+      json.decodeFromString<Map<String, EpisodeRecord>>(indexFile.readText())
+    }.getOrNull() ?: emptyMap()
+    // Older content has files but no index entry; recover records from
+    // downloads/favorites (both created before this store in NerLanApp).
+    val known = HashMap<String, EpisodeRecord>()
+    NerLanApp.instance.downloads.records.value.forEach { known[it.id] = it }
+    NerLanApp.instance.favorites.episodes.value.forEach { known[it.id] = it }
+    val merged = loaded.toMutableMap()
+    var changed = false
+    for (id in ids()) if (id !in merged) known[id]?.let { merged[id] = it; changed = true }
+    if (changed) persist(merged)
+    return merged
+  }
+
+  private fun persist(map: Map<String, EpisodeRecord> = _records.value) {
+    runCatching { indexFile.writeText(json.encodeToString(map)) }
+  }
+
+  /** Record that an episode now has AI content; persist for the AI tab. */
+  private fun noteRecord(record: EpisodeRecord) {
+    _records.update { it + (record.id to record) }
+    persist()
+  }
+
   // MARK: Triggers
 
   fun processTranscript(record: EpisodeRecord) {
@@ -72,6 +130,8 @@ class AIContentStore(private val context: Context) {
   fun clearAll() {
     transcriptsDir.listFiles()?.forEach { it.delete() }
     handoutsDir.listFiles()?.forEach { it.delete() }
+    _records.value = emptyMap()
+    persist()
     _jobs.value = emptyMap()
     _revision.value += 1
   }
@@ -83,6 +143,11 @@ class AIContentStore(private val context: Context) {
       AiKind.HANDOUT -> handoutFile(id).delete()
     }
     clearJob(key(kind, id))
+    // Drop the record once the episode has no AI content left.
+    if (!hasTranscript(id) && !hasHandout(id)) {
+      _records.update { it - id }
+      persist()
+    }
     _revision.value += 1
   }
 
@@ -130,6 +195,7 @@ class AIContentStore(private val context: Context) {
       }.getOrNull() ?: raw
 
       transcriptFile(record.id).writeText(text)
+      noteRecord(record)
       clearJob(k)
       text
     } catch (e: Exception) {
@@ -151,6 +217,7 @@ class AIContentStore(private val context: Context) {
       val fragment = OpenAIService.generateHandout(
         transcript, record, settings.chatModelOrDefault(), settings.apiKey.value)
       handoutFile(record.id).writeText(fragment)
+      noteRecord(record)
       clearJob(k)
     } catch (e: Exception) {
       setJob(k, JobState.Failed(e.message ?: "處理失敗"))

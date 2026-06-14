@@ -1,5 +1,7 @@
 package com.example.nerlan.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -33,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -40,8 +44,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import android.text.format.Formatter
 import com.example.nerlan.NerLanApp
+import com.example.nerlan.data.DriveSync
 import com.example.nerlan.data.SettingsStore
 import com.example.nerlan.player.AudioCache
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 
 /**
  * OpenAI credentials & model configuration, shown as a full-screen dialog from
@@ -50,12 +57,27 @@ import com.example.nerlan.player.AudioCache
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onDismiss: () -> Unit) {
+  val context = LocalContext.current
   val settings = NerLanApp.instance.settings
   val ai = NerLanApp.instance.ai
+  val drive = NerLanApp.instance.drive
   val apiKey by settings.apiKey.collectAsState()
   val chatModel by settings.chatModel.collectAsState()
   val transcriptionModel by settings.transcriptionModel.collectAsState()
   val cacheStreamedAudio by settings.cacheStreamedAudio.collectAsState()
+  val syncToDrive by settings.syncToDrive.collectAsState()
+  val driveEmail by drive.accountEmail.collectAsState()
+  val driveStatus by drive.status.collectAsState()
+  val signInLauncher = rememberLauncherForActivityResult(
+    ActivityResultContracts.StartActivityForResult(),
+  ) { result ->
+    try {
+      val account = GoogleSignIn.getSignedInAccountFromIntent(result.data).getResult(ApiException::class.java)
+      drive.onSignedIn(account)
+    } catch (e: ApiException) {
+      drive.reportSignInError(e.statusCode)
+    }
+  }
   var showClearConfirm by remember { mutableStateOf(false) }
   var showClearCacheConfirm by remember { mutableStateOf(false) }
   var modelMenuExpanded by remember { mutableStateOf(false) }
@@ -164,6 +186,42 @@ fun SettingsScreen(onDismiss: () -> Unit) {
           TextButton(onClick = { showClearCacheConfirm = true }, enabled = cacheBytes > 0) {
             Text("清除快取音檔", color = MaterialTheme.colorScheme.error)
           }
+
+          Spacer(Modifier.height(16.dp))
+          Text("Google 雲端同步", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 4.dp))
+          if (driveEmail == null) {
+            Button(onClick = { signInLauncher.launch(DriveSync.signInClient(context).signInIntent) }) {
+              Text("使用 Google 帳戶登入")
+            }
+          } else {
+            Text("已登入：$driveEmail", style = MaterialTheme.typography.bodyMedium)
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            ) {
+              Text("同步到 Google 雲端硬碟", modifier = Modifier.weight(1f))
+              Switch(
+                checked = syncToDrive,
+                onCheckedChange = { settings.setSyncToDrive(it); if (it) drive.syncNow() },
+              )
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              TextButton(onClick = { drive.syncNow() }, enabled = syncToDrive) { Text("立即同步") }
+              TextButton(onClick = { drive.signOut(); settings.setSyncToDrive(false) }) {
+                Text("登出", color = MaterialTheme.colorScheme.error)
+              }
+            }
+          }
+          Text(
+            buildString {
+              append("將收藏、逐字稿與 AI 講義同步到你的 Google 雲端硬碟私人應用程式資料夾（音檔不會同步）。")
+              driveStatus?.let { append("\n$it") }
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+          )
 
           Spacer(Modifier.height(16.dp))
           TextButton(onClick = { showClearConfirm = true }) {

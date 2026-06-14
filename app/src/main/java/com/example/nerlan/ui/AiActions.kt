@@ -46,8 +46,14 @@ import com.example.nerlan.data.EpisodeRecord
  */
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun AiActionButton(kind: AiKind, record: EpisodeRecord, compact: Boolean) {
+fun AiActionButton(
+  kind: AiKind,
+  record: EpisodeRecord,
+  compact: Boolean,
+  onOpenedInPanel: (() -> Unit)? = null,
+) {
   val ai = NerLanApp.instance.ai
+  val panel = LocalStudyPanel.current
   val jobs by ai.jobs.collectAsState()
   val revision by ai.revision.collectAsState()
   val job = jobs["${kind.prefix}:${record.id}"]
@@ -62,7 +68,18 @@ fun AiActionButton(kind: AiKind, record: EpisodeRecord, compact: Boolean) {
   var showMenu by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
 
-  LaunchedEffect(ready) { if (ready && pendingOpen) { pendingOpen = false; showSheet = true } }
+  // On large screens route content to the detail panel; else open a dialog.
+  fun open() {
+    if (panel != null) {
+      panel.item =
+        if (kind == AiKind.TRANSCRIPT) StudyItem.Transcript(record) else StudyItem.Handout(record)
+      onOpenedInPanel?.invoke()
+    } else {
+      showSheet = true
+    }
+  }
+
+  LaunchedEffect(ready) { if (ready && pendingOpen) { pendingOpen = false; open() } }
   LaunchedEffect(failureMessage) {
     if (failureMessage != null && pendingOpen) { pendingOpen = false; errorMessage = failureMessage }
   }
@@ -75,7 +92,7 @@ fun AiActionButton(kind: AiKind, record: EpisodeRecord, compact: Boolean) {
     when {
       running -> {}
       failureMessage != null -> errorMessage = failureMessage
-      ready -> showSheet = true
+      ready -> open()
       else -> { pendingOpen = true; start() }
     }
   }

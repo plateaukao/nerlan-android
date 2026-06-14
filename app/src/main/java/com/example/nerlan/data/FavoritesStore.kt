@@ -20,6 +20,12 @@ class FavoritesStore(filesDir: File) {
   private inline fun <reified T> load(file: File): T? =
     runCatching { json.decodeFromString<T>(file.readText()) }.getOrNull()
 
+  /** Re-read both files into the flows; used after a Drive pull merges changes. */
+  fun reload() {
+    _episodes.value = load<List<EpisodeRecord>>(episodesFile) ?: emptyList()
+    _programs.value = load<List<Program>>(programsFile) ?: emptyList()
+  }
+
   // Episodes
 
   fun isFavorite(episodeId: String) = _episodes.value.any { it.id == episodeId }

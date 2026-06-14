@@ -92,12 +92,24 @@ fun SectionHeader(title: String) {
   )
 }
 
-/** Shared row for favorites & downloads lists: tap to play, trash to remove. */
+/**
+ * Shared row for favorites / downloads / AI lists: tap to play, optional trash.
+ * In [aiReadyOnly] mode (the AI tab) the transcript/handout buttons appear only
+ * for content that already exists, regardless of whether an API key is set.
+ */
 @Composable
-fun RecordRow(record: EpisodeRecord, queue: List<EpisodeRecord>, onDelete: () -> Unit) {
+fun RecordRow(
+  record: EpisodeRecord,
+  queue: List<EpisodeRecord>,
+  onDelete: (() -> Unit)? = null,
+  aiReadyOnly: Boolean = false,
+) {
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
   val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
+  val ai = NerLanApp.instance.ai
+  val revision by ai.revision.collectAsState()
+  val panel = LocalStudyPanel.current
   val isCurrent = current?.id == record.id
   var showAttachment by remember { mutableStateOf(false) }
 
@@ -132,18 +144,27 @@ fun RecordRow(record: EpisodeRecord, queue: List<EpisodeRecord>, onDelete: () ->
       modifier = Modifier.size(20.dp),
     )
     if (record.pdfAttachments.isNotEmpty()) {
-      IconButton(onClick = { showAttachment = true }) {
+      IconButton(onClick = {
+        if (panel != null) panel.item = StudyItem.Attachment(record) else showAttachment = true
+      }) {
         Icon(Icons.Filled.Info, contentDescription = "講義",
           tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
       }
     }
-    if (apiKey.isNotBlank()) {
+    if (aiReadyOnly) {
+      val hasTranscript = remember(revision, record.id) { ai.hasTranscript(record.id) }
+      val hasHandout = remember(revision, record.id) { ai.hasHandout(record.id) }
+      if (hasTranscript) AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
+      if (hasHandout) AiActionButton(AiKind.HANDOUT, record, compact = true)
+    } else if (apiKey.isNotBlank()) {
       AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
       AiActionButton(AiKind.HANDOUT, record, compact = true)
     }
-    IconButton(onClick = onDelete) {
-      Icon(Icons.Filled.Delete, contentDescription = "移除",
-        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+    if (onDelete != null) {
+      IconButton(onClick = onDelete) {
+        Icon(Icons.Filled.Delete, contentDescription = "移除",
+          tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+      }
     }
   }
 

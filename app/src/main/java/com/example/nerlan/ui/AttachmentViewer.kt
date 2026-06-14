@@ -67,53 +67,59 @@ import okhttp3.Request
 fun AttachmentViewer(title: String, attachments: List<Attachment>, onDismiss: () -> Unit) {
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
     Surface(Modifier.fillMaxSize()) {
-      Column(Modifier.fillMaxSize()) {
-        var selected by remember { mutableStateOf(attachments.firstOrNull()) }
-        var switcherOpen by remember { mutableStateOf(false) }
+      AttachmentContent(title, attachments, onDismiss)
+    }
+  }
+}
 
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-        ) {
-          IconButton(onClick = onDismiss) {
-            Icon(Icons.Filled.Close, contentDescription = "關閉")
+/** The PDF reader body, shared by the phone dialog and the large-screen panel. */
+@Composable
+fun AttachmentContent(title: String, attachments: List<Attachment>, onClose: () -> Unit) {
+  Column(Modifier.fillMaxSize()) {
+    var selected by remember(attachments) { mutableStateOf(attachments.firstOrNull()) }
+    var switcherOpen by remember { mutableStateOf(false) }
+
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+    ) {
+      IconButton(onClick = onClose) {
+        Icon(Icons.Filled.Close, contentDescription = "關閉")
+      }
+      Text(
+        title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+      )
+      // Let the user switch between handouts when an episode has several.
+      if (attachments.size > 1) {
+        Box {
+          IconButton(onClick = { switcherOpen = true }) {
+            Icon(Icons.Filled.UnfoldMore, contentDescription = "選擇附件")
           }
-          Text(
-            title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
-          )
-          // Let the user switch between handouts when an episode has several.
-          if (attachments.size > 1) {
-            Box {
-              IconButton(onClick = { switcherOpen = true }) {
-                Icon(Icons.Filled.UnfoldMore, contentDescription = "選擇附件")
-              }
-              DropdownMenu(expanded = switcherOpen, onDismissRequest = { switcherOpen = false }) {
-                attachments.forEach { attachment ->
-                  DropdownMenuItem(
-                    text = { Text(attachment.displayName + if (attachment == selected) " ✓" else "") },
-                    onClick = {
-                      selected = attachment
-                      switcherOpen = false
-                    },
-                  )
-                }
-              }
+          DropdownMenu(expanded = switcherOpen, onDismissRequest = { switcherOpen = false }) {
+            attachments.forEach { attachment ->
+              DropdownMenuItem(
+                text = { Text(attachment.displayName + if (attachment == selected) " ✓" else "") },
+                onClick = {
+                  selected = attachment
+                  switcherOpen = false
+                },
+              )
             }
           }
         }
-
-        val attachment = selected
-        if (attachment == null) {
-          CenteredMessage("沒有附件")
-        } else {
-          PdfReader(attachment)
-        }
       }
+    }
+
+    val attachment = selected
+    if (attachment == null) {
+      CenteredMessage("沒有附件")
+    } else {
+      PdfReader(attachment)
     }
   }
 }

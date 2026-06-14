@@ -2,14 +2,18 @@ package com.example.nerlan.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -23,7 +27,10 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,9 +47,10 @@ import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
 
 /**
- * Root scaffold: three tabs (節目/收藏/下載) with the mini player floating
- * above the bottom navigation bar, mirroring the iOS layout. The 節目 and
- * 收藏 tabs keep their own back stack for program detail pages.
+ * Root scaffold: four tabs (節目/收藏/下載/AI) with the mini player floating
+ * above the bottom navigation bar, mirroring the iOS layout. On large screens
+ * (width >= 720.dp) the browser sits in a left pane with a transcript/handout/
+ * 講義 detail panel on the right, like the iPad two-pane layout.
  */
 @Composable
 fun MainScreen() {
@@ -52,51 +60,81 @@ fun MainScreen() {
   var favoritesDetail by remember { mutableStateOf<Program?>(null) }
   var showPlayerSheet by remember { mutableStateOf(false) }
   val current by PlayerManager.current.collectAsState()
+  val panel = remember { StudyPanelController() }
 
-  Scaffold(
-    bottomBar = {
-      Column {
-        if (current != null) {
-          MiniPlayerBar(onTap = { showPlayerSheet = true })
+  val browser = @Composable {
+    Scaffold(
+      bottomBar = {
+        Column {
+          if (current != null) {
+            MiniPlayerBar(onTap = { showPlayerSheet = true })
+          }
+          NavigationBar {
+            NavigationBarItem(
+              selected = tab == 0,
+              onClick = { tab = 0 },
+              icon = { Icon(Icons.Filled.Radio, contentDescription = null) },
+              label = { Text("節目") },
+            )
+            NavigationBarItem(
+              selected = tab == 1,
+              onClick = { tab = 1 },
+              icon = { Icon(Icons.Filled.Favorite, contentDescription = null) },
+              label = { Text("收藏") },
+            )
+            NavigationBarItem(
+              selected = tab == 2,
+              onClick = { tab = 2 },
+              icon = { Icon(Icons.Filled.ArrowDownward, contentDescription = null) },
+              label = { Text("下載") },
+            )
+            NavigationBarItem(
+              selected = tab == 3,
+              onClick = { tab = 3 },
+              icon = { Icon(Icons.Filled.AutoAwesome, contentDescription = null) },
+              label = { Text("AI") },
+            )
+          }
         }
-        NavigationBar {
-          NavigationBarItem(
-            selected = tab == 0,
-            onClick = { tab = 0 },
-            icon = { Icon(Icons.Filled.Radio, contentDescription = null) },
-            label = { Text("節目") },
-          )
-          NavigationBarItem(
-            selected = tab == 1,
-            onClick = { tab = 1 },
-            icon = { Icon(Icons.Filled.Favorite, contentDescription = null) },
-            label = { Text("收藏") },
-          )
-          NavigationBarItem(
-            selected = tab == 2,
-            onClick = { tab = 2 },
-            icon = { Icon(Icons.Filled.ArrowDownward, contentDescription = null) },
-            label = { Text("下載") },
-          )
+      },
+    ) { padding ->
+      Box(Modifier.fillMaxSize().padding(padding)) {
+        when (tab) {
+          0 -> programsDetail?.let { program ->
+            ProgramDetailScreen(program, onBack = { programsDetail = null })
+          } ?: ProgramListScreen(onProgramClick = { programsDetail = it })
+          1 -> favoritesDetail?.let { program ->
+            ProgramDetailScreen(program, onBack = { favoritesDetail = null })
+          } ?: FavoritesScreen(onProgramClick = { favoritesDetail = it })
+          2 -> DownloadsScreen()
+          3 -> AiTabScreen()
         }
-      }
-    },
-  ) { padding ->
-    Box(Modifier.fillMaxSize().padding(padding)) {
-      when (tab) {
-        0 -> programsDetail?.let { program ->
-          ProgramDetailScreen(program, onBack = { programsDetail = null })
-        } ?: ProgramListScreen(onProgramClick = { programsDetail = it })
-        1 -> favoritesDetail?.let { program ->
-          ProgramDetailScreen(program, onBack = { favoritesDetail = null })
-        } ?: FavoritesScreen(onProgramClick = { favoritesDetail = it })
-        2 -> DownloadsScreen()
       }
     }
   }
 
-  if (showPlayerSheet) {
-    PlayerSheet(onDismiss = { showPlayerSheet = false })
+  BoxWithConstraints(Modifier.fillMaxSize()) {
+    // 600dp is the conventional Android tablet breakpoint; at/above it we show
+    // the iPad-style browser + detail two-pane (covers 7"+ tablets in portrait).
+    val twoPane = maxWidth >= 600.dp
+    CompositionLocalProvider(LocalStudyPanel provides (if (twoPane) panel else null)) {
+      if (twoPane) {
+        // When a new episode starts, default the panel to its study content
+        // (PDF handout, else AI handout, else transcript).
+        LaunchedEffect(current) { panel.item = current?.let { defaultStudyItem(it) } }
+        Row(Modifier.fillMaxSize()) {
+          Box(Modifier.width(380.dp).fillMaxHeight()) { browser() }
+          VerticalDivider()
+          Box(Modifier.weight(1f).fillMaxHeight()) { StudyDetailPanel(panel) }
+        }
+      } else {
+        browser()
+      }
+
+      if (showPlayerSheet) {
+        PlayerSheet(onDismiss = { showPlayerSheet = false })
+      }
+    }
   }
 }
 

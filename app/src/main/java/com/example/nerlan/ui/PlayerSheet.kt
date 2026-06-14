@@ -61,6 +61,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   val favorites = NerLanApp.instance.favorites
   val downloads = NerLanApp.instance.downloads
   val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
+  val panel = LocalStudyPanel.current
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
   val positionMs by PlayerManager.positionMs.collectAsState()
@@ -222,7 +223,13 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         }
 
         if (record.pdfAttachments.isNotEmpty()) {
-          TextButton(onClick = { showAttachment = true }, contentPadding = controlPadding) {
+          TextButton(
+            onClick = {
+              if (panel != null) { panel.item = StudyItem.Attachment(record); onDismiss() }
+              else showAttachment = true
+            },
+            contentPadding = controlPadding,
+          ) {
             Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(20.dp))
             Text("講義", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
           }
@@ -258,8 +265,8 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
           modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
         ) {
-          AiActionButton(AiKind.TRANSCRIPT, record, compact = false)
-          AiActionButton(AiKind.HANDOUT, record, compact = false)
+          AiActionButton(AiKind.TRANSCRIPT, record, compact = false, onOpenedInPanel = onDismiss)
+          AiActionButton(AiKind.HANDOUT, record, compact = false, onOpenedInPanel = onDismiss)
         }
       }
 

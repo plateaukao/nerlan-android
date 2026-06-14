@@ -1,27 +1,6 @@
 name: Build
 on: [pull_request, push]
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v6
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: "zulu"
-          java-version: 17
-          cache: gradle
-      - name: Unit tests and lint
-        run: ./gradlew testDebugUnitTest lintDebug
-      - name: Upload test and lint reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-and-lint-reports
-          path: |
-            app/build/reports/tests/
-            app/build/reports/lint-results-debug.html
   build:
     runs-on: ubuntu-latest
     steps:

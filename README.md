@@ -1,6 +1,8 @@
 # NerLan (Android)
 
-[![Build](https://github.com/plateaukao/nerlan-android/actions/workflows/build.yaml/badge.svg)](https://github.com/plateaukao/nerlan-android/actions/workflows/build.yaml)
+[![Build](https://github.com/plateaukao/nerlan-android/actions/workflows/build.yaml/badge.svg)](https://github.com/plateaukao/nerlan-android/actions/workflows/build.yaml)   [<img src="https://badgen.net/badge/download/snapshot_apk/green">](https://nightly.link/plateaukao/nerlan-android/workflows/build.yaml/main/app-release.apk.zip)
+
+**[⬇ Download the latest snapshot APK](https://nightly.link/plateaukao/nerlan-android/workflows/build.yaml/main/app-release.apk.zip)** — built from `main` on every push, no GitHub login required (served via [nightly.link](https://nightly.link)). Unzip to get `app-release.apk`.
 
 NerLan is an Android language-learning audio player for Taiwan's National Education Radio (國立教育廣播電台) **Channel+** platform. It makes the station's language-learning programs easy to browse, stream, and download for offline study — wrapped in a modern Jetpack Compose UI with Material 3 Expressive styling.
 

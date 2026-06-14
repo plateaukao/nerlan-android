@@ -43,6 +43,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -103,16 +104,23 @@ fun MainScreen() {
       },
     ) { padding ->
       Box(Modifier.fillMaxSize().padding(padding)) {
-        when (tab) {
-          0 -> programsDetail?.let { program ->
+        // Keep every tab — and the program detail overlaid on its list —
+        // composed, so switching tabs or opening/closing a program never
+        // re-fetches or resets filters/scroll. Only the active tab is drawn.
+        TabContainer(tab == 0) {
+          ProgramListScreen(onProgramClick = { programsDetail = it })
+          programsDetail?.let { program ->
             ProgramDetailScreen(program, onBack = { programsDetail = null })
-          } ?: ProgramListScreen(onProgramClick = { programsDetail = it })
-          1 -> favoritesDetail?.let { program ->
-            ProgramDetailScreen(program, onBack = { favoritesDetail = null })
-          } ?: FavoritesScreen(onProgramClick = { favoritesDetail = it })
-          2 -> DownloadsScreen()
-          3 -> AiTabScreen()
+          }
         }
+        TabContainer(tab == 1) {
+          FavoritesScreen(onProgramClick = { favoritesDetail = it })
+          favoritesDetail?.let { program ->
+            ProgramDetailScreen(program, onBack = { favoritesDetail = null })
+          }
+        }
+        TabContainer(tab == 2) { DownloadsScreen() }
+        TabContainer(tab == 3) { AiTabScreen() }
       }
     }
   }
@@ -151,6 +159,26 @@ fun MainScreen() {
       }
     }
   }
+}
+
+/**
+ * Hosts one tab's content. The content is always composed (so its loaded data,
+ * filters and scroll state survive), but only measured and drawn when [active] —
+ * inactive tabs stay alive without being shown or receiving touches.
+ */
+@Composable
+private fun TabContainer(active: Boolean, content: @Composable () -> Unit) {
+  Box(
+    Modifier.fillMaxSize().layout { measurable, constraints ->
+      val placeable = measurable.measure(constraints)
+      if (active) {
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+      } else {
+        // Composed (state retained) but not placed: nothing drawn or touchable.
+        layout(0, 0) {}
+      }
+    },
+  ) { content() }
 }
 
 /** Compact now-playing bar shown above the bottom navigation. */

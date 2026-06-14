@@ -1,6 +1,9 @@
 package com.example.nerlan
 
 import android.app.Application
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.example.nerlan.data.AIContentStore
 import com.example.nerlan.data.DownloadManager
 import com.example.nerlan.data.DriveSync
@@ -29,6 +32,13 @@ class NerLanApp : Application() {
     drive = DriveSync(this)
     // Pull/push on launch when sync is on (no-op if not signed in).
     if (settings.syncToDrive.value) drive.syncNow()
+    // Flush changes when the app goes to the background (ProcessLifecycleOwner's
+    // ON_STOP ignores rotation/config changes).
+    ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+      override fun onStop(owner: LifecycleOwner) {
+        if (settings.syncToDrive.value) drive.syncNow()
+      }
+    })
   }
 
   companion object {

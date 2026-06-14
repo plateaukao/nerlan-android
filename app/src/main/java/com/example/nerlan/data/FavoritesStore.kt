@@ -1,5 +1,6 @@
 package com.example.nerlan.data
 
+import com.example.nerlan.NerLanApp
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +36,7 @@ class FavoritesStore(filesDir: File) {
       if (isFavorite(record.id)) _episodes.value.filterNot { it.id == record.id }
       else _episodes.value + record
     episodesFile.writeText(json.encodeToString(_episodes.value))
+    NerLanApp.instance.drive.requestSync()
   }
 
   // Programs
@@ -46,5 +48,6 @@ class FavoritesStore(filesDir: File) {
       if (isFavoriteProgram(program.programId)) _programs.value.filterNot { it.programId == program.programId }
       else _programs.value + program
     programsFile.writeText(json.encodeToString(_programs.value))
+    NerLanApp.instance.drive.requestSync()
   }
 }

@@ -13,10 +13,14 @@ import com.google.android.gms.common.api.Scope
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -75,20 +79,39 @@ class DriveSync(private val context: Context) {
     _status.value = null
   }
 
+  private val syncMutex = Mutex()
+  private var debounceJob: Job? = null
+
   /** Run a full sync in the background (no-op if not signed in). */
   fun syncNow() {
     if (_accountEmail.value == null) return
-    scope.launch {
-      _status.value = "同步中…"
-      runCatching { sync() }
-        .onSuccess { (up, down) -> _status.value = "已同步（↑$up ↓$down）" }
-        .onFailure {
-          _status.value = when (it) {
-            is UserRecoverableAuthException -> "需要重新授權，請重新登入"
-            else -> "同步失敗：${it.message}"
-          }
-        }
+    scope.launch { runSyncWithStatus() }
+  }
+
+  /**
+   * Debounced auto-sync after a local change (favoriting, or a transcript/handout
+   * finishing). Coalesces a burst of changes into one sync ~2.5s after the last
+   * one. No-op unless sync is on and signed in.
+   */
+  fun requestSync() {
+    if (!NerLanApp.instance.settings.syncToDrive.value || _accountEmail.value == null) return
+    debounceJob?.cancel()
+    debounceJob = scope.launch {
+      delay(2_500)
+      runSyncWithStatus()
     }
+  }
+
+  private suspend fun runSyncWithStatus() {
+    _status.value = "同步中…"
+    runCatching { syncMutex.withLock { sync() } }
+      .onSuccess { (up, down) -> _status.value = "已同步（↑$up ↓$down）" }
+      .onFailure {
+        _status.value = when (it) {
+          is UserRecoverableAuthException -> "需要重新授權，請重新登入"
+          else -> "同步失敗：${it.message}"
+        }
+      }
   }
 
   // MARK: - Sync engine

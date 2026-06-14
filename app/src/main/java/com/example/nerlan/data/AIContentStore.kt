@@ -111,6 +111,7 @@ class AIContentStore(private val context: Context) {
   private fun noteRecord(record: EpisodeRecord) {
     _records.update { it + (record.id to record) }
     persist()
+    NerLanApp.instance.drive.requestSync()
   }
 
   // MARK: Triggers

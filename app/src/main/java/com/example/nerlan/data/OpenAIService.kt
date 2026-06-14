@@ -108,11 +108,12 @@ object OpenAIService {
   suspend fun segmentTranscript(raw: String, model: String, apiKey: String): String {
     if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
     val system = buildString {
-      append("你是一個只負責加上句尾標點與斷句的文字編輯器。你會收到一段語音辨識（ASR）產生的逐字稿，通常缺少標點。")
+      append("你是一個只負責加上標點與斷句的文字編輯器。你會收到一段語音辨識（ASR）產生的逐字稿，通常缺少標點。")
       append("規則：")
-      append("1. 只能加入句尾的句號（中文用「。」，外語用「.」）並在每句後換行，每句一行。")
-      append("2. 絕對不可更動任何原始內容：不可翻譯、改寫、增刪、調整字詞或更改任何字元；簡繁字體與外語（日文、英文、韓文等）原文都必須原封不動保留。")
-      append("3. 只輸出處理後的逐字稿，每句一行，不要加編號，也不要任何其他說明文字。")
+      append("1. 加入適當且必要的標點符號（句號、問號、驚嘆號、逗號等；中文用全形「，。？！」，外語用半形「,.?!」），並在每句結束後換行，每句一行。")
+      append("2. 若原文該處已有適當的標點（例如已是「？」或「！」），請保留原樣，不要再額外加上句號或重複的標點。")
+      append("3. 絕對不可更動任何原始內容：不可翻譯、改寫、增刪、調整字詞或更改任何字元；簡繁字體與外語（日文、英文、韓文等）原文都必須原封不動保留。")
+      append("4. 只輸出處理後的逐字稿，每句一行，不要加編號，也不要任何其他說明文字。")
     }
     val out = StringBuilder()
     for (piece in chunk(raw, 4000)) {

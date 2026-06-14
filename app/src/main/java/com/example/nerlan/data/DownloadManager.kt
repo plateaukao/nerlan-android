@@ -8,6 +8,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import okhttp3.Request
 
@@ -25,6 +27,14 @@ class DownloadManager(filesDir: File) {
 
   /** attachmentKeys currently being fetched, to avoid duplicate concurrent downloads. */
   private val attachmentsInFlight = ConcurrentHashMap.newKeySet<String>()
+
+  /**
+   * Caps concurrent audio downloads. We use OkHttp's *synchronous* execute(),
+   * which bypasses the dispatcher's per-host/total request limits, so tapping
+   * download on many episodes would otherwise launch up to ~64 simultaneous
+   * connections (Dispatchers.IO's pool) and starve other IO.
+   */
+  private val audioSemaphore = Semaphore(3)
 
   private val _records = MutableStateFlow(
     runCatching { json.decodeFromString<List<EpisodeRecord>>(recordsFile.readText()) }
@@ -62,39 +72,50 @@ class DownloadManager(filesDir: File) {
     if (isDownloaded(record.id) || isDownloading(record.id)) return
     _progress.value += (record.id to 0f)
     scope.launch {
-      val dest = fileFor(record.id)
-      val tmp = File(dest.path + ".part")
-      try {
-        val request = Request.Builder().url(url).build()
-        ChannelPlusApi.client.newCall(request).execute().use { response ->
-          if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-          val body = response.body ?: throw Exception("empty body")
-          val total = body.contentLength()
-          body.byteStream().use { input ->
-            tmp.outputStream().use { output ->
-              val buffer = ByteArray(64 * 1024)
-              var copied = 0L
-              while (true) {
-                val n = input.read(buffer)
-                if (n < 0) break
-                output.write(buffer, 0, n)
-                copied += n
-                if (total > 0) {
-                  _progress.value += (record.id to (copied.toFloat() / total).coerceAtMost(1f))
+      audioSemaphore.withPermit {
+        val dest = fileFor(record.id)
+        val tmp = File(dest.path + ".part")
+        var lastStep = -1
+        try {
+          val request = Request.Builder().url(url).build()
+          ChannelPlusApi.client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
+            val body = response.body ?: throw Exception("empty body")
+            val total = body.contentLength()
+            body.byteStream().use { input ->
+              tmp.outputStream().use { output ->
+                val buffer = ByteArray(64 * 1024)
+                var copied = 0L
+                while (true) {
+                  val n = input.read(buffer)
+                  if (n < 0) break
+                  output.write(buffer, 0, n)
+                  copied += n
+                  if (total > 0) {
+                    // Publish only on 10% steps: emitting on every chunk
+                    // allocates a fresh map and recomposes every visible row, and
+                    // a 24dp indicator can't show finer than ~10% anyway. So at
+                    // most ~10 emissions per download.
+                    val step = (copied * 10 / total).toInt().coerceAtMost(10)
+                    if (step != lastStep) {
+                      lastStep = step
+                      _progress.value += (record.id to step / 10f)
+                    }
+                  }
                 }
               }
             }
           }
+          tmp.renameTo(dest)
+          if (_records.value.none { it.id == record.id }) {
+            _records.value += record
+            recordsFile.writeText(json.encodeToString(_records.value))
+          }
+        } catch (_: Exception) {
+          tmp.delete()
+        } finally {
+          _progress.value -= record.id
         }
-        tmp.renameTo(dest)
-        if (_records.value.none { it.id == record.id }) {
-          _records.value += record
-          recordsFile.writeText(json.encodeToString(_records.value))
-        }
-      } catch (_: Exception) {
-        tmp.delete()
-      } finally {
-        _progress.value -= record.id
       }
     }
   }

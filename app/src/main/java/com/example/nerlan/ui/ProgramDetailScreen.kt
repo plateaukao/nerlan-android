@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -40,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,22 +50,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.nerlan.NerLanApp
+import com.example.nerlan.data.CatalogCache
 import com.example.nerlan.data.Episode
 import com.example.nerlan.data.EpisodeRecord
 import com.example.nerlan.data.ChannelPlusApi
 import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
+import kotlinx.coroutines.launch
 
 /** Program info plus its full episode archive (infinite scroll, oldest first). */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
   val favorites = NerLanApp.instance.favorites
+  val catalog = NerLanApp.instance.catalog
+  val scope = rememberCoroutineScope()
   var episodes by remember { mutableStateOf<List<Episode>>(emptyList()) }
   var page by remember { mutableIntStateOf(0) }
   var totalPages by remember { mutableIntStateOf(1) }
   var totalCount by remember { mutableIntStateOf(0) }
   var isLoading by remember { mutableStateOf(false) }
+  var isRefreshing by remember { mutableStateOf(false) }
+  var initialized by remember { mutableStateOf(false) }
   var showFullIntro by remember { mutableStateOf(false) }
   var loadTrigger by remember { mutableIntStateOf(0) }
   val favoritePrograms by favorites.programs.collectAsState()
@@ -77,8 +85,33 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
     }
   }
 
-  LaunchedEffect(loadTrigger, nearEnd) {
-    if (!isLoading && (page == 0 || (nearEnd && page < totalPages))) {
+  fun persist() {
+    scope.launch {
+      catalog.saveEpisodes(
+        program.programId,
+        CatalogCache.EpisodePageCache(episodes, page, totalPages, totalCount),
+      )
+    }
+  }
+
+  // On first appearance, restore cached episode pages (no network); infinite
+  // scroll then resumes from the cached cursor. Only fetch on a cache miss.
+  LaunchedEffect(Unit) {
+    val cached = catalog.loadEpisodes(program.programId)
+    if (cached != null && cached.episodes.isNotEmpty()) {
+      episodes = cached.episodes
+      page = cached.page
+      totalPages = cached.totalPages
+      totalCount = cached.totalCount
+    }
+    initialized = true
+    loadTrigger += 1
+  }
+
+  // Infinite scroll: fetch the next page near the end (and page 1 when there was
+  // no cache). Persists each page so reopening the program skips the network.
+  LaunchedEffect(loadTrigger, nearEnd, initialized) {
+    if (initialized && !isLoading && (page == 0 || (nearEnd && page < totalPages))) {
       isLoading = true
       try {
         val result = ChannelPlusApi.episodes(program.programId, page + 1)
@@ -87,11 +120,31 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
         page += 1
         totalPages = result.totalPages
         totalCount = result.totalCount
+        persist()
       } catch (_: Exception) {
         // keep what we have; scrolling retriggers
       }
       isLoading = false
       loadTrigger += 1
+    }
+  }
+
+  // Pull-to-refresh: re-fetch from the first page, replacing the cache. Episodes
+  // are ascending, so a higher total count surfaces newly-added ones on scroll.
+  fun refresh() {
+    scope.launch {
+      isRefreshing = true
+      try {
+        val result = ChannelPlusApi.episodes(program.programId, 1)
+        episodes = result.episodes
+        page = 1
+        totalPages = result.totalPages
+        totalCount = result.totalCount
+        persist()
+      } catch (_: Exception) {
+        // keep what we have on a failed refresh
+      }
+      isRefreshing = false
     }
   }
 
@@ -122,7 +175,12 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
       )
     },
   ) { padding ->
-    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(padding)) {
+    PullToRefreshBox(
+      isRefreshing = isRefreshing,
+      onRefresh = { refresh() },
+      modifier = Modifier.fillMaxSize().padding(padding),
+    ) {
+      LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
       item {
         Column(Modifier.padding(16.dp)) {
           Row {
@@ -188,6 +246,7 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
             LoadingIndicator(Modifier.size(32.dp))
           }
         }
+      }
       }
     }
   }

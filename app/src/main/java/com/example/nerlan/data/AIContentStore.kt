@@ -62,6 +62,10 @@ class AIContentStore(private val context: Context) {
 
   fun hasTranscript(id: String) = transcriptFile(id).exists()
   fun hasHandout(id: String) = handoutFile(id).exists()
+
+  /** Counts of saved content, for the 資料統計 screen. */
+  fun transcriptCount(): Int = transcriptsDir.listFiles()?.count { it.isFile } ?: 0
+  fun handoutCount(): Int = handoutsDir.listFiles()?.count { it.isFile } ?: 0
   fun transcriptText(id: String): String? = transcriptFile(id).takeIf { it.exists() }?.readText()
   fun handoutHtml(id: String): String? = handoutFile(id).takeIf { it.exists() }?.readText()
 

@@ -146,6 +146,13 @@ class DownloadManager(filesDir: File) {
     }
   }
 
+  // Inventory (for the 資料統計 screen).
+  fun downloadedBytes(): Long = audioDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+
+  fun attachmentBytes(): Long = attachmentsDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+
+  fun attachmentCount(): Int = attachmentsDir.listFiles()?.count { it.isFile } ?: 0
+
   fun delete(episodeId: String) {
     fileFor(episodeId).delete()
     _records.value.firstOrNull { it.id == episodeId }?.attachments.orEmpty().forEach {

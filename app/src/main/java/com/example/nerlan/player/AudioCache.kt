@@ -70,6 +70,10 @@ object AudioCache {
     return cacheDir(context).walkTopDown().filter { it.isFile }.sumOf { it.length() }
   }
 
+  /** Number of distinct cached resources (one per streamed episode), or -1 if the
+   *  cache isn't initialised yet (its index can't be read without opening it). */
+  fun cachedResourceCount(context: Context): Int = cache?.keys?.size ?: -1
+
   fun clear(context: Context) {
     val c = cache
     if (c != null) {

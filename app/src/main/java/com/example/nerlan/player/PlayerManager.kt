@@ -73,14 +73,29 @@ object PlayerManager {
       c.addListener(object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
           _isPlaying.value = isPlaying
+          // Persist the tally and request a sync when playback stops.
+          if (!isPlaying) NerLanApp.instance.stats.flush()
         }
         override fun onRepeatModeChanged(repeatMode: Int) {
           _repeatMode.value = repeatMode
         }
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+          // An auto-advance or a repeat-one loop means the previous item played to
+          // its end — count it before _current moves on.
+          if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+            reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
+            NerLanApp.instance.stats.noteCompleted(_current.value)
+          }
           _current.value = mediaItem?.let(::recordOf)
           _hasNext.value = c.hasNextMediaItem()
           _hasPrevious.value = c.hasPreviousMediaItem()
+        }
+        override fun onPlaybackStateChanged(playbackState: Int) {
+          // The whole queue finished (no further transition fires) — count the
+          // final episode's completion and flush the listening tally.
+          if (playbackState == Player.STATE_ENDED) {
+            NerLanApp.instance.stats.noteCompleted(_current.value)
+          }
         }
         override fun onEvents(player: Player, events: Player.Events) {
           _hasNext.value = player.hasNextMediaItem()
@@ -93,10 +108,24 @@ object PlayerManager {
     }, MoreExecutors.directExecutor())
 
     scope.launch {
+      // Credit real time spent in the playing state to the listening stats.
+      // Gaps from pause/seek/backgrounding (delta >= 5s) are dropped, so this is
+      // wall-clock listening time, independent of playback rate.
+      var lastTick = 0L
       while (true) {
-        controller?.let {
-          _positionMs.value = it.currentPosition.coerceAtLeast(0)
-          _durationMs.value = it.duration.takeIf { d -> d > 0 } ?: 0
+        controller?.let { c ->
+          _positionMs.value = c.currentPosition.coerceAtLeast(0)
+          _durationMs.value = c.duration.takeIf { d -> d > 0 } ?: 0
+          if (c.isPlaying) {
+            val now = System.currentTimeMillis()
+            if (lastTick != 0L) {
+              val delta = (now - lastTick) / 1000.0
+              if (delta in 0.0..5.0) NerLanApp.instance.stats.addListening(delta, _current.value)
+            }
+            lastTick = now
+          } else {
+            lastTick = 0L
+          }
         }
         delay(500)
       }

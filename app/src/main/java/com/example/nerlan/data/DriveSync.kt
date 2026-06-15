@@ -151,9 +151,29 @@ class DriveSync(private val context: Context) {
       writeContent(rf.name, downloadBytes(token, rf.id)); pulled++
     }
 
+    // Listening stats: one blob per device, summed on read (a G-counter). Push
+    // our own blob, pull everyone else's. Isolated so a stats hiccup can't abort
+    // the favorites/AI sync above.
+    runCatching { syncStats(token, remote) }.onSuccess { (up, down) -> pushed += up; pulled += down }
+
     NerLanApp.instance.favorites.reload()
     NerLanApp.instance.ai.reloadIndex()
     return pushed to pulled
+  }
+
+  /** Mirror this device's stats blob up and pull every other device's down. */
+  private fun syncStats(token: String, remote: Map<String, DriveFile>): Pair<Int, Int> {
+    val stats = NerLanApp.instance.stats
+    val ownName = stats.driveFileName
+    upsert(token, ownName, remote[ownName]?.id, stats.ownJsonBytes(), "application/json")
+    var pulled = 0
+    for (rf in remote.values) {
+      if (rf.name != ownName && rf.name.startsWith("stats-") && rf.name.endsWith(".json")) {
+        stats.savePeer(rf.name, downloadBytes(token, rf.id)); pulled++
+      }
+    }
+    stats.reloadPeers()
+    return 1 to pulled
   }
 
   /** Merge one metadata file: download remote, run [merge], upload the result.

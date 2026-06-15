@@ -80,6 +80,8 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   }
   var showClearConfirm by remember { mutableStateOf(false) }
   var showClearCacheConfirm by remember { mutableStateOf(false) }
+  var showUsageStats by remember { mutableStateOf(false) }
+  var showDataStats by remember { mutableStateOf(false) }
   var modelMenuExpanded by remember { mutableStateOf(false) }
   var cacheBytes by remember { mutableStateOf(AudioCache.sizeBytes(NerLanApp.instance)) }
 
@@ -232,10 +234,20 @@ fun SettingsScreen(onDismiss: () -> Unit) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
+
+          Spacer(Modifier.height(16.dp))
+          Text("統計", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 4.dp))
+          TextButton(onClick = { showUsageStats = true }) { Text("使用統計") }
+          TextButton(onClick = { showDataStats = true }) { Text("資料統計") }
+          Spacer(Modifier.height(16.dp))
         }
       }
     }
   }
+
+  if (showUsageStats) UsageStatsScreen(onDismiss = { showUsageStats = false })
+  if (showDataStats) DataStatsScreen(onDismiss = { showDataStats = false })
 
   if (showClearConfirm) {
     AlertDialog(

@@ -157,7 +157,9 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
     topBar = {
       TopAppBar(
         windowInsets = WindowInsets(0),
-        title = { Text(program.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        // The header below shows the program name next to the cover, so don't repeat
+        // it as the app-bar title.
+        title = {},
         navigationIcon = {
           IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")

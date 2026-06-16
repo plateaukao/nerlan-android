@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,7 +48,6 @@ fun PodcastDetailScreen(feed: PodcastFeed, onBack: () -> Unit) {
   val feeds by podcasts.feeds.collectAsState()
   // Prefer the freshest stored copy (pull-to-refresh updates the store).
   val current = feeds.firstOrNull { it.id == feed.id } ?: feed
-  val isSubscribed = feeds.any { it.id == feed.id }
   var isRefreshing by remember { mutableStateOf(false) }
   var showFullIntro by remember { mutableStateOf(false) }
 
@@ -59,21 +56,14 @@ fun PodcastDetailScreen(feed: PodcastFeed, onBack: () -> Unit) {
     topBar = {
       TopAppBar(
         windowInsets = WindowInsets(0),
-        title = { Text(current.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        // The header below shows the title next to the cover, so don't repeat it
+        // here. A podcast has no favorite/subscribe heart (which read as a Favorites
+        // entry it never was): it's added from the list's "+" and removed by
+        // long-pressing its row in 我的 Podcast.
+        title = {},
         navigationIcon = {
           IconButton(onClick = onBack) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-          }
-        },
-        actions = {
-          IconButton(onClick = {
-            if (isSubscribed) podcasts.unsubscribe(feed.id) else podcasts.subscribe(current)
-          }) {
-            Icon(
-              if (isSubscribed) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-              contentDescription = "訂閱",
-              tint = MaterialTheme.colorScheme.error,
-            )
           }
         },
       )

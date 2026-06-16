@@ -141,6 +141,12 @@ class DriveSync(private val context: Context) {
       indexFile.writeText(json.encodeToString(merged))
       json.encodeToString(merged)
     }
+    // Podcast subscriptions: union-merge by feed id (the RSS URL). Each device keeps
+    // its own episode snapshots fresh via pull-to-refresh; additions propagate.
+    pushed += syncMetadata(token, remote, "podcasts.json") { remoteBytes ->
+      val merged = mergeById(readList<PodcastFeed>(podcastsFile), decodeList<PodcastFeed>(remoteBytes)) { it.id }
+      podcastsFile.writeText(json.encodeToString(merged)); json.encodeToString(merged)
+    }
 
     // Content files (write-once): push local-only up, pull remote-only down.
     val local = contentFiles()
@@ -158,6 +164,7 @@ class DriveSync(private val context: Context) {
 
     NerLanApp.instance.favorites.reload()
     NerLanApp.instance.ai.reloadIndex()
+    NerLanApp.instance.podcasts.reload()
     return pushed to pulled
   }
 
@@ -198,6 +205,7 @@ class DriveSync(private val context: Context) {
   private val favoritesFile get() = File(filesDir, "favorites.json")
   private val programsFile get() = File(filesDir, "favorite-programs.json")
   private val indexFile get() = File(filesDir, "ai/index.json")
+  private val podcastsFile get() = File(filesDir, "podcasts.json")
 
   private inline fun <reified T> readList(file: File): List<T> =
     runCatching { json.decodeFromString<List<T>>(file.readText()) }.getOrNull() ?: emptyList()
@@ -211,15 +219,17 @@ class DriveSync(private val context: Context) {
   private fun decodeMap(bytes: ByteArray?): Map<String, EpisodeRecord> =
     bytes?.let { runCatching { json.decodeFromString<Map<String, EpisodeRecord>>(String(it)) }.getOrNull() } ?: emptyMap()
 
-  /** drive name -> local content file, for transcripts and handouts. */
+  /** drive name -> local content file, for transcripts, handouts, and cue sidecars. */
   private fun contentFiles(): Map<String, File> = buildMap {
     File(filesDir, "ai/transcripts").listFiles()?.forEach { put("transcript-${it.nameWithoutExtension}.txt", it) }
     File(filesDir, "ai/handouts").listFiles()?.forEach { put("handout-${it.nameWithoutExtension}.html", it) }
+    File(filesDir, "ai/cues").listFiles()?.forEach { put("cues-${it.nameWithoutExtension}.json", it) }
   }
 
   private fun isContentName(name: String) =
     (name.startsWith("transcript-") && name.endsWith(".txt")) ||
-      (name.startsWith("handout-") && name.endsWith(".html"))
+      (name.startsWith("handout-") && name.endsWith(".html")) ||
+      (name.startsWith("cues-") && name.endsWith(".json"))
 
   private fun writeContent(name: String, bytes: ByteArray) {
     when {
@@ -230,6 +240,10 @@ class DriveSync(private val context: Context) {
       name.startsWith("handout-") && name.endsWith(".html") -> {
         val id = name.removePrefix("handout-").removeSuffix(".html")
         File(filesDir, "ai/handouts").apply { mkdirs() }.let { File(it, "$id.html").writeBytes(bytes) }
+      }
+      name.startsWith("cues-") && name.endsWith(".json") -> {
+        val id = name.removePrefix("cues-").removeSuffix(".json")
+        File(filesDir, "ai/cues").apply { mkdirs() }.let { File(it, "$id.json").writeBytes(bytes) }
       }
     }
   }

@@ -1,5 +1,6 @@
 package com.example.nerlan.data
 
+import com.example.nerlan.NerLanApp
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +45,7 @@ class PodcastStore(filesDir: File) {
   fun unsubscribe(id: String) {
     _feeds.value = _feeds.value.filterNot { it.id == id }
     persist()
+    NerLanApp.instance.drive.requestSync()
   }
 
   /** Re-fetch a subscribed feed (its id is the resolved RSS URL) and replace the
@@ -53,6 +55,10 @@ class PodcastStore(filesDir: File) {
     upsert(PodcastFeedParser.parse(xml, id))
   }
 
+  /** Re-read podcasts.json into the live list — used after a Drive sync merges in
+   *  shows subscribed on another device. */
+  fun reload() { _feeds.value = load() }
+
   private fun upsert(feed: PodcastFeed) {
     _feeds.value = if (_feeds.value.any { it.id == feed.id }) {
       _feeds.value.map { if (it.id == feed.id) feed else it }
@@ -60,6 +66,7 @@ class PodcastStore(filesDir: File) {
       _feeds.value + feed
     }
     persist()
+    NerLanApp.instance.drive.requestSync()
   }
 
   private fun persist() {

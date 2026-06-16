@@ -34,6 +34,9 @@ class AIContentStore(private val context: Context) {
 
   private val transcriptsDir = File(context.filesDir, "ai/transcripts").apply { mkdirs() }
   private val handoutsDir = File(context.filesDir, "ai/handouts").apply { mkdirs() }
+  /** Sidecar timestamp cues for transcripts, keyed by episode id. Synced as
+   *  write-once content files alongside the transcript (see DriveSync). */
+  private val cuesDir = File(context.filesDir, "ai/cues").apply { mkdirs() }
   private val indexFile = File(context.filesDir, "ai/index.json")
   private val json = Json { ignoreUnknownKeys = true }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -60,9 +63,18 @@ class AIContentStore(private val context: Context) {
 
   private fun transcriptFile(id: String) = File(transcriptsDir, "$id.txt")
   private fun handoutFile(id: String) = File(handoutsDir, "$id.html")
+  private fun cueFile(id: String) = File(cuesDir, "$id.json")
 
   fun hasTranscript(id: String) = transcriptFile(id).exists()
   fun hasHandout(id: String) = handoutFile(id).exists()
+
+  /** Timestamp cues for an episode's transcript, when present. Null for transcripts
+   *  made before cues existed (or with a no-timestamp model), which the transcript
+   *  screen then renders without highlighting. */
+  fun transcriptCues(id: String): List<TranscriptCue>? =
+    cueFile(id).takeIf { it.exists() }?.let {
+      runCatching { json.decodeFromString<List<TranscriptCue>>(it.readText()) }.getOrNull()
+    }
 
   /** Counts of saved content, for the 資料統計 screen. */
   fun transcriptCount(): Int = transcriptsDir.listFiles()?.count { it.isFile } ?: 0
@@ -136,6 +148,7 @@ class AIContentStore(private val context: Context) {
   fun clearAll() {
     transcriptsDir.listFiles()?.forEach { it.delete() }
     handoutsDir.listFiles()?.forEach { it.delete() }
+    cuesDir.listFiles()?.forEach { it.delete() }
     _records.value = emptyMap()
     persist()
     _jobs.value = emptyMap()
@@ -145,7 +158,7 @@ class AIContentStore(private val context: Context) {
   /** Delete one episode's saved content of [kind]. */
   fun delete(kind: AiKind, id: String) {
     when (kind) {
-      AiKind.TRANSCRIPT -> transcriptFile(id).delete()
+      AiKind.TRANSCRIPT -> { transcriptFile(id).delete(); cueFile(id).delete() }
       AiKind.HANDOUT -> handoutFile(id).delete()
     }
     clearJob(key(kind, id))
@@ -180,13 +193,27 @@ class AIContentStore(private val context: Context) {
       // Long episodes are split into chunks (the gpt-4o-transcribe models cap
       // input at 1400 s); transcribe each and join.
       val chunks = AudioTranscoder.transcodeChunks(context, record.id, Uri.fromFile(source), source)
-      val prompt = OpenAIService.transcriptionPrompt(record.language)
+      // A monolingual source (a podcast) carries its locale: force that language and
+      // drop the Chinese teaching prompt, which would otherwise bias a foreign-language
+      // podcast toward Chinese. NER programs are bilingual (Mandarin host + foreign
+      // examples), so they keep the priming prompt and no forced language.
+      val locale = record.audioLocale
+      val prompt = if (locale == null) OpenAIService.transcriptionPrompt(record.language) else null
+      val segments = mutableListOf<OpenAIService.Segment>()
       val raw = try {
         val parts = mutableListOf<String>()
         for ((i, chunk) in chunks.withIndex()) {
           if (chunks.size > 1) setJob(k, JobState.Running("轉錄中…（${i + 1}/${chunks.size}）"))
-          parts += OpenAIService.transcribe(
-            chunk, settings.transcriptionModelOrDefault(), settings.apiKey.value, prompt = prompt)
+          val result = OpenAIService.transcribe(
+            chunk, settings.transcriptionModelOrDefault(), settings.apiKey.value,
+            prompt = prompt, language = locale)
+          parts += result.text
+          if (result.segments.isNotEmpty()) {
+            // Each chunk is transcoded 0-based, so shift its timestamps onto the
+            // absolute episode timeline by the chunk's start offset.
+            val offset = i * AudioTranscoder.MAX_CHUNK_SECONDS.toDouble()
+            segments += result.segments.map { OpenAIService.Segment(it.start + offset, it.text) }
+          }
         }
         parts.joinToString("\n")
       } finally {
@@ -201,6 +228,13 @@ class AIContentStore(private val context: Context) {
       }.getOrNull() ?: raw
 
       transcriptFile(record.id).writeText(text)
+
+      // Map each cleaned display sentence to the segment covering its first content
+      // character, so each gets a start time. Best effort: no segments (a non-whisper
+      // model) means no cue file and the transcript shows without highlighting.
+      val cues = alignCues(displaySentences(text), segments)
+      if (cues.isNotEmpty()) cueFile(record.id).writeText(json.encodeToString(cues)) else cueFile(record.id).delete()
+
       noteRecord(record)
       clearJob(k)
       text
@@ -261,6 +295,49 @@ class AIContentStore(private val context: Context) {
   }
 
   companion object {
+    /** The display sentences of a stored transcript: one trimmed, non-empty line
+     *  each. Must match how the transcript UI splits the same text so cues line up
+     *  one-to-one with the rendered rows. */
+    fun displaySentences(text: String): List<String> =
+      text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+
+    /**
+     * Map each cleaned display sentence to a start time by aligning it to the timed
+     * ASR [segments]. The chat re-segmentation only adds punctuation and line breaks
+     * — never changing content characters — so a sentence's content (letters/digits,
+     * ignoring spaces and punctuation) appears in order within the segment stream.
+     * Walk both monotonically and read each sentence's start off the segment covering
+     * its first content character. Returns [] if there are no segments to align to.
+     */
+    fun alignCues(sentences: List<String>, segments: List<OpenAIService.Segment>): List<TranscriptCue> {
+      if (segments.isEmpty() || sentences.isEmpty()) return emptyList()
+      val chars = ArrayList<Char>()
+      val times = ArrayList<Double>()
+      for (seg in segments) for (c in seg.text) if (c.isLetterOrDigit()) { chars.add(c); times.add(seg.start) }
+      if (chars.isEmpty()) return emptyList()
+
+      val cues = ArrayList<TranscriptCue>(sentences.size)
+      var idx = 0
+      var lastStart = times[0]
+      for (sentence in sentences) {
+        val content = sentence.filter { it.isLetterOrDigit() }
+        val first = content.firstOrNull()
+        if (first != null) {
+          // Resync: find this sentence's first content char at/after the cursor,
+          // scanning a small window to absorb minor ASR/chat drift.
+          val limit = minOf(chars.size, idx + 32)
+          var probe = idx
+          while (probe < limit && chars[probe] != first) probe++
+          if (probe < limit) idx = probe
+        }
+        val start = if (idx < times.size) times[idx] else lastStart
+        lastStart = start
+        cues.add(TranscriptCue(start, sentence))
+        idx = minOf(chars.size, idx + maxOf(1, content.length))
+      }
+      return cues
+    }
+
     /** Each handout "Part" covers at most this many seconds of audio (~15 min). */
     private const val HANDOUT_PART_SECONDS = 900
 

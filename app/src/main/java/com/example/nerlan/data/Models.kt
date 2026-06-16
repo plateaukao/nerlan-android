@@ -61,6 +61,16 @@ data class LanguageTags(
   val contentLevel: List<Tag>? = null,
 )
 
+/**
+ * One display sentence of a transcript plus the audio time (in seconds) at which
+ * it begins, derived from the ASR segment timestamps. Persisted as a sidecar so
+ * the transcript screen can highlight the sentence currently being spoken.
+ * Transcripts produced before this existed — or with a model that returns no
+ * timestamps — simply have no cues and render without highlighting.
+ */
+@Serializable
+data class TranscriptCue(val start: Double, val text: String)
+
 // MARK: Programs
 
 @Serializable
@@ -131,6 +141,11 @@ data class EpisodeRecord(
   // Optional so records persisted before they existed still decode without migration.
   val durationSeconds: Int? = null,   // episode length, when known
   val audioExt: String? = null,       // audio file extension ("mp3"/"m4a"); null ⇒ "mp3"
+  // Language of the audio for monolingual sources (podcasts), so transcription can
+  // force it: an ISO-639-1 code ("ko"), or "" when monolingual but the locale is
+  // unknown. null for NER programs, which are bilingual (Mandarin host + foreign
+  // examples) and must not be forced. Presence (non-null) marks a podcast.
+  val audioLocale: String? = null,
 ) {
   /** PDF attachments, the only kind we can render inline. */
   val pdfAttachments: List<Attachment> get() = attachments.orEmpty().filter { it.isPdf }

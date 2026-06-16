@@ -1,7 +1,9 @@
 package com.example.nerlan.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -165,7 +169,11 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (Podcas
             )
           }
           items(feeds.size, key = { "podcast-${feeds[it].id}" }) { i ->
-            PodcastRow(feeds[i], onClick = { onPodcastClick(feeds[i]) })
+            PodcastRow(
+              feeds[i],
+              onClick = { onPodcastClick(feeds[i]) },
+              onUnsubscribe = { podcasts.unsubscribe(feeds[i].id) },
+            )
           }
         }
         visibleGroups.forEach { group ->
@@ -247,39 +255,47 @@ fun ProgramRow(program: Program, onClick: () -> Unit) {
   }
 }
 
-/** Row for a subscribed podcast in the "我的 Podcast" section (mirrors ProgramRow). */
+/** Row for a subscribed podcast in the "我的 Podcast" section (mirrors ProgramRow).
+ *  Long-press to unsubscribe — podcasts have no favorite/subscribe heart. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PodcastRow(feed: PodcastFeed, onClick: () -> Unit) {
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier
-      .fillMaxWidth()
-      .clickable(onClick = onClick)
-      .padding(horizontal = 16.dp, vertical = 8.dp),
-  ) {
-    CoverImage(feed.coverUrl, 56.dp)
-    Column(Modifier.padding(start = 12.dp)) {
-      Text(
-        feed.title,
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.Medium,
-        maxLines = 2,
-      )
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        feed.author?.takeIf { it.isNotEmpty() }?.let { author ->
+fun PodcastRow(feed: PodcastFeed, onClick: () -> Unit, onUnsubscribe: () -> Unit) {
+  var showMenu by remember { mutableStateOf(false) }
+  Box {
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier
+        .fillMaxWidth()
+        .combinedClickable(onClick = onClick, onLongClick = { showMenu = true })
+        .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+      CoverImage(feed.coverUrl, 56.dp)
+      Column(Modifier.padding(start = 12.dp)) {
+        Text(
+          feed.title,
+          style = MaterialTheme.typography.bodyLarge,
+          fontWeight = FontWeight.Medium,
+          maxLines = 2,
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          feed.author?.takeIf { it.isNotEmpty() }?.let { author ->
+            Text(
+              author,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
           Text(
-            author,
+            "共 ${feed.episodes.size} 集",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 6.dp),
           )
         }
-        Text(
-          "共 ${feed.episodes.size} 集",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.padding(start = 6.dp),
-        )
       }
+    }
+    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+      DropdownMenuItem(text = { Text("取消訂閱") }, onClick = { showMenu = false; onUnsubscribe() })
     }
   }
 }

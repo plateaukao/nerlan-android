@@ -7,6 +7,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -41,22 +43,44 @@ object OpenAIService {
 
   // MARK: Transcription
 
+  /** One timed unit of ASR output: the segment's text and the audio time (seconds,
+   *  relative to the file transcribed) at which it begins. */
+  data class Segment(val start: Double, val text: String)
+
+  /** Result of a transcription: the full text plus, when the model supports it, the
+   *  per-segment timestamps. [segments] is empty for models that return no timing. */
+  data class TranscriptionResult(val text: String, val segments: List<Segment>)
+
+  /** Whether a transcription model returns segment timestamps. Only whisper-1
+   *  supports response_format=verbose_json; the gpt-4o-transcribe models accept
+   *  json/text only and would reject verbose_json. */
+  fun supportsSegments(model: String): Boolean = model.lowercase().contains("whisper")
+
   /**
-   * Transcribe an audio file via POST /audio/transcriptions (multipart).
+   * Transcribe an audio file via POST /audio/transcriptions (multipart). Whisper
+   * models are asked for verbose_json so per-segment timestamps come back (used to
+   * highlight the playing sentence); other models get response_format=text.
    *
    * [prompt] biases Whisper's output script/vocabulary. These are bilingual
-   * teaching programs (Mandarin host + foreign examples); without a prompt
-   * Whisper locks onto the dominant language (Chinese) and collapses the foreign
-   * speech into Chinese characters. Priming it with Traditional Chinese plus a
-   * native-script sample of the target language keeps both intact — build one
-   * with [transcriptionPrompt].
+   * teaching programs (Mandarin host + foreign examples); without a prompt Whisper
+   * locks onto the dominant language (Chinese) and collapses the foreign speech
+   * into Chinese characters. [language] (ISO-639-1, e.g. "ko") forces the spoken
+   * language for monolingual sources (podcasts); leave null for bilingual NER
+   * content, which relies on [prompt] and per-passage detection instead.
    */
-  suspend fun transcribe(file: File, model: String, apiKey: String, prompt: String? = null): String =
-    withContext(Dispatchers.IO) {
+  suspend fun transcribe(
+    file: File,
+    model: String,
+    apiKey: String,
+    prompt: String? = null,
+    language: String? = null,
+  ): TranscriptionResult = withContext(Dispatchers.IO) {
     if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
+    val wantSegments = supportsSegments(model)
     val body = MultipartBody.Builder().setType(MultipartBody.FORM)
       .addFormDataPart("model", model)
-      .addFormDataPart("response_format", "text")
+      .addFormDataPart("response_format", if (wantSegments) "verbose_json" else "text")
+      .apply { if (!language.isNullOrBlank()) addFormDataPart("language", language) }
       .apply { if (!prompt.isNullOrBlank()) addFormDataPart("prompt", prompt) }
       .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
       .build()
@@ -66,9 +90,22 @@ object OpenAIService {
       .post(body)
       .build()
     client.newCall(request).execute().use { response ->
-      val text = response.body?.string().orEmpty()
-      if (!response.isSuccessful) throw OpenAIException(errorMessage(text) ?: "OpenAI 請求失敗（HTTP ${response.code}）")
-      text.trim()
+      val bodyStr = response.body?.string().orEmpty()
+      if (!response.isSuccessful) throw OpenAIException(errorMessage(bodyStr) ?: "OpenAI 請求失敗（HTTP ${response.code}）")
+      if (!wantSegments) return@use TranscriptionResult(bodyStr.trim(), emptyList())
+      // verbose_json: { "text": "...", "segments": [ { "start": 0.0, "text": "..." }, ... ] }
+      val root = runCatching { json.parseToJsonElement(bodyStr).jsonObject }
+        .getOrElse { throw OpenAIException("無法解析 OpenAI 回應") }
+      val segments = root["segments"]?.jsonArray?.mapNotNull { el ->
+        val obj = el.jsonObject
+        val start = obj["start"]?.jsonPrimitive?.doubleOrNull
+        val segText = obj["text"]?.jsonPrimitive?.contentOrNull
+        if (start != null && segText != null) Segment(start, segText) else null
+      }.orEmpty()
+      val full = root["text"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+      val text = full.ifEmpty { segments.joinToString("") { it.text }.trim() }
+      if (text.isEmpty()) throw OpenAIException("無法解析 OpenAI 回應")
+      TranscriptionResult(text, segments)
     }
   }
 
@@ -112,13 +149,16 @@ object OpenAIService {
       append("規則：")
       append("1. 加入適當且必要的標點符號（句號、問號、驚嘆號、逗號等；中文用全形「，。？！」，外語用半形「,.?!」），並在每句結束後換行，每句一行。")
       append("2. 若原文該處已有適當的標點（例如已是「？」或「！」），請保留原樣，不要再額外加上句號或重複的標點。")
-      append("3. 絕對不可更動任何原始內容：不可翻譯、改寫、增刪、調整字詞或更改任何字元；簡繁字體與外語（日文、英文、韓文等）原文都必須原封不動保留。")
-      append("4. 只輸出處理後的逐字稿，每句一行，不要加編號，也不要任何其他說明文字。")
+      append("3. 絕對不可更動任何原始內容：不可翻譯、改寫、增刪、調整字詞或更改任何字元。")
+      append("4. 【最重要】原文若含有非中文文字（韓文諺文 한글、日文假名、英文字母、其他外語等），必須一字不差地原樣保留其原始文字與字母，嚴禁將其翻譯、音譯、或轉寫成中文／漢字。例如「안녕하세요」必須維持為「안녕하세요」，絕不可變成「你好」或任何漢字；簡繁字體也一律維持原樣。")
+      append("5. 只輸出處理後的逐字稿，每句一行，不要加編號，也不要任何其他說明文字。")
     }
     val out = StringBuilder()
     for (piece in chunk(raw, 4000)) {
       if (out.isNotEmpty()) out.append('\n')
-      out.append(chat(system, piece, model, apiKey).trim())
+      // temperature 0: this is a mechanical punctuate-and-split task, so the model
+      // must stay faithful and never drift into translating the foreign passages.
+      out.append(chat(system, piece, model, apiKey, temperature = 0.0).trim())
     }
     return out.toString()
   }
@@ -165,11 +205,20 @@ object OpenAIService {
 
   // MARK: Helpers
 
-  /** One round-trip to POST /chat/completions, returning the message content. */
-  private suspend fun chat(system: String, user: String, model: String, apiKey: String): String =
+  /** One round-trip to POST /chat/completions, returning the message content.
+   *  [temperature] is sent only when provided (0 for faithful, mechanical tasks
+   *  like sentence segmentation; omitted to keep the model's default elsewhere). */
+  private suspend fun chat(
+    system: String,
+    user: String,
+    model: String,
+    apiKey: String,
+    temperature: Double? = null,
+  ): String =
     withContext(Dispatchers.IO) {
       val payload = buildJsonObject {
         put("model", model)
+        if (temperature != null) put("temperature", temperature)
         putJsonArray("messages") {
           addJsonObject { put("role", "system"); put("content", system) }
           addJsonObject { put("role", "user"); put("content", user) }

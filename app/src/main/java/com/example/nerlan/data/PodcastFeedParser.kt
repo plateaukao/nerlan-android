@@ -81,6 +81,11 @@ object PodcastFeedParser {
     }
 
     val language = mappedLanguage(channelLang)
+    // The feed is monolingual, so keep the raw locale (e.g. "ko") to force the
+    // transcription language. Use "" when there's no usable code: that still marks
+    // the record as a (monolingual) podcast — distinct from null/NER — so
+    // transcription skips the Chinese teaching prompt and lets whisper detect.
+    val locale = localeCode(channelLang) ?: ""
     val cover = channelImage.ifEmpty { null }
     val records = items.mapNotNull { it ->
       if (it.audio.isEmpty()) return@mapNotNull null   // unplayable without audio
@@ -97,6 +102,7 @@ object PodcastFeedParser {
         attachments = null,
         durationSeconds = durationSeconds(it.duration),
         audioExt = audioExt(it.type, it.audio),
+        audioLocale = locale,
       )
     }
     if (records.isEmpty()) throw ParseException("這個 RSS 沒有可播放的單集")
@@ -161,6 +167,14 @@ object PodcastFeedParser {
       if (d != null) return out.format(d)
     }
     return null
+  }
+
+  /** The feed's `<language>` reduced to an ISO-639-1 primary subtag (e.g. "ko-KR"
+   *  -> "ko"), suitable for the transcription `language` parameter. null when the
+   *  feed declares no usable 2-letter code, in which case whisper auto-detects. */
+  private fun localeCode(code: String): String? {
+    val primary = code.lowercase().substringBefore("-")
+    return if (primary.length == 2 && primary.all { it in 'a'..'z' }) primary else null
   }
 
   /** Map an RSS `<language>` code to the Chinese learning-language label the

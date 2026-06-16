@@ -141,12 +141,11 @@ class DriveSync(private val context: Context) {
       indexFile.writeText(json.encodeToString(merged))
       json.encodeToString(merged)
     }
-    // Podcast subscriptions: union-merge by feed id (the RSS URL). Each device keeps
-    // its own episode snapshots fresh via pull-to-refresh; additions propagate.
-    pushed += syncMetadata(token, remote, "podcasts.json") { remoteBytes ->
-      val merged = mergeById(readList<PodcastFeed>(podcastsFile), decodeList<PodcastFeed>(remoteBytes)) { it.id }
-      podcastsFile.writeText(json.encodeToString(merged)); json.encodeToString(merged)
-    }
+    // Podcast subscriptions: union-merge the feed data plus a last-writer-wins
+    // subscription ledger, keeping only feeds the merged ledger marks subscribed.
+    // The ledger lets unsubscribe/re-subscribe propagate across devices — a plain
+    // union-merge of the list can't (it keeps re-adding a removed show).
+    pushed += syncPodcasts(token, remote)
 
     // Content files (write-once): push local-only up, pull remote-only down.
     val local = contentFiles()
@@ -200,12 +199,52 @@ class DriveSync(private val context: Context) {
   private fun <T> mergeById(local: List<T>, remote: List<T>, id: (T) -> String): List<T> =
     (remote + local).associateBy(id).values.sortedBy(id)
 
+  /** Sync podcast subscriptions: union-merge the feed data and LWW-merge the
+   *  subscription ledger, then keep only feeds the ledger marks subscribed (a
+   *  missing entry defaults to subscribed, for shows added before the ledger
+   *  existed). Uploads both files; returns the number uploaded. */
+  private fun syncPodcasts(token: String, remote: Map<String, DriveFile>): Int {
+    val ledgerRf = remote["podcast-subs.json"]
+    val mergedLedger = mergeLedger(
+      readLedger(subsFile),
+      decodeLedger(ledgerRf?.let { downloadBytes(token, it.id) }),
+    )
+    val feedsRf = remote["podcasts.json"]
+    val unionFeeds = mergeById(
+      readList<PodcastFeed>(podcastsFile),
+      decodeList<PodcastFeed>(feedsRf?.let { downloadBytes(token, it.id) }),
+    ) { it.id }
+    val subscribed = unionFeeds.filter { mergedLedger[it.id]?.subscribed ?: true }
+
+    subsFile.writeText(json.encodeToString(mergedLedger))
+    podcastsFile.writeText(json.encodeToString(subscribed))
+    upsert(token, "podcast-subs.json", ledgerRf?.id, json.encodeToString(mergedLedger).toByteArray(), "application/json")
+    upsert(token, "podcasts.json", feedsRf?.id, json.encodeToString(subscribed).toByteArray(), "application/json")
+    return 2
+  }
+
+  private fun mergeLedger(a: Map<String, SubEntry>, b: Map<String, SubEntry>): Map<String, SubEntry> {
+    val out = HashMap(a)
+    for ((id, e) in b) {
+      val cur = out[id]
+      if (cur == null || e.ts > cur.ts) out[id] = e
+    }
+    return out
+  }
+
+  private fun readLedger(file: File): Map<String, SubEntry> =
+    runCatching { json.decodeFromString<Map<String, SubEntry>>(file.readText()) }.getOrNull() ?: emptyMap()
+
+  private fun decodeLedger(bytes: ByteArray?): Map<String, SubEntry> =
+    bytes?.let { runCatching { json.decodeFromString<Map<String, SubEntry>>(String(it)) }.getOrNull() } ?: emptyMap()
+
   // MARK: - Local file mapping
 
   private val favoritesFile get() = File(filesDir, "favorites.json")
   private val programsFile get() = File(filesDir, "favorite-programs.json")
   private val indexFile get() = File(filesDir, "ai/index.json")
   private val podcastsFile get() = File(filesDir, "podcasts.json")
+  private val subsFile get() = File(filesDir, "podcast-subs.json")
 
   private inline fun <reified T> readList(file: File): List<T> =
     runCatching { json.decodeFromString<List<T>>(file.readText()) }.getOrNull() ?: emptyList()

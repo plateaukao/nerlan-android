@@ -207,3 +207,12 @@ data class PodcastFeed(
       .replace("&nbsp;", " ")
       .trim()
 }
+
+/**
+ * Last-writer-wins subscription state for one podcast feed (keyed by feed id in
+ * `podcast-subs.json`). Drive sync merges these by newest [ts], so an unsubscribe
+ * — and a later re-subscribe — propagate across devices, which a plain union-merge
+ * of the feed list can't express (it would keep re-adding a removed show).
+ */
+@Serializable
+data class SubEntry(val subscribed: Boolean, val ts: Long)

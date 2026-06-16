@@ -14,13 +14,22 @@ import kotlinx.serialization.json.Json
  */
 class PodcastStore(filesDir: File) {
   private val file = File(filesDir, "podcasts.json")
+  /** Last-writer-wins subscription ledger (feed id -> [SubEntry]); lets Drive sync
+   *  propagate unsubscribe/re-subscribe across devices. */
+  private val subsFile = File(filesDir, "podcast-subs.json")
   private val json = Json { ignoreUnknownKeys = true }
 
   private val _feeds = MutableStateFlow(load())
   val feeds: StateFlow<List<PodcastFeed>> = _feeds
 
+  private var ledger: MutableMap<String, SubEntry> = loadLedger()
+
   private fun load(): List<PodcastFeed> =
     runCatching { json.decodeFromString<List<PodcastFeed>>(file.readText()) }.getOrNull() ?: emptyList()
+
+  private fun loadLedger(): MutableMap<String, SubEntry> =
+    runCatching { json.decodeFromString<MutableMap<String, SubEntry>>(subsFile.readText()) }.getOrNull()
+      ?: mutableMapOf()
 
   fun isSubscribed(id: String) = _feeds.value.any { it.id == id }
   fun feed(id: String): PodcastFeed? = _feeds.value.firstOrNull { it.id == id }
@@ -44,6 +53,7 @@ class PodcastStore(filesDir: File) {
 
   fun unsubscribe(id: String) {
     _feeds.value = _feeds.value.filterNot { it.id == id }
+    ledger[id] = SubEntry(subscribed = false, ts = System.currentTimeMillis())
     persist()
     NerLanApp.instance.drive.requestSync()
   }
@@ -55,9 +65,12 @@ class PodcastStore(filesDir: File) {
     upsert(PodcastFeedParser.parse(xml, id))
   }
 
-  /** Re-read podcasts.json into the live list — used after a Drive sync merges in
-   *  shows subscribed on another device. */
-  fun reload() { _feeds.value = load() }
+  /** Re-read podcasts.json and the subscription ledger into memory — used after a
+   *  Drive sync merges in changes from another device. */
+  fun reload() {
+    _feeds.value = load()
+    ledger = loadLedger()
+  }
 
   private fun upsert(feed: PodcastFeed) {
     _feeds.value = if (_feeds.value.any { it.id == feed.id }) {
@@ -65,11 +78,13 @@ class PodcastStore(filesDir: File) {
     } else {
       _feeds.value + feed
     }
+    ledger[feed.id] = SubEntry(subscribed = true, ts = System.currentTimeMillis())
     persist()
     NerLanApp.instance.drive.requestSync()
   }
 
   private fun persist() {
     runCatching { file.writeText(json.encodeToString(_feeds.value)) }
+    runCatching { subsFile.writeText(json.encodeToString(ledger)) }
   }
 }

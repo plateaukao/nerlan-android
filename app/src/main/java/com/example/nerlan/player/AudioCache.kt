@@ -6,6 +6,7 @@ import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.FileDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
@@ -51,7 +52,11 @@ object AudioCache {
   fun dataSourceFactory(context: Context, shouldWrite: () -> Boolean): DataSource.Factory {
     val appContext = context.applicationContext
     val cache = simpleCache(appContext)
-    val httpUpstream = DefaultDataSource.Factory(appContext)
+    // Some podcast audio (e.g. BBC) lives on an https enclosure that 302-redirects
+    // to a plain-http CDN host. Allow cross-protocol redirects so those play;
+    // cleartext itself is permitted by network_security_config.xml.
+    val http = DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true)
+    val httpUpstream = DefaultDataSource.Factory(appContext, http)
     return DataSource.Factory {
       val cacheSource = CacheDataSource.Factory()
         .setCache(cache)

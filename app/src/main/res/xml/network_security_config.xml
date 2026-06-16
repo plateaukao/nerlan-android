@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Podcast feeds are user-supplied and from arbitrary domains. Many legitimate
+  feeds (e.g. BBC's open.live.bbc.co.uk audio and ichef.bbci.co.uk cover art)
+  still serve audio and images over plain HTTP, and some https enclosures even
+  302-redirect to an http host. Since the app targets API 28+, cleartext is
+  blocked by default, which silently breaks cover art and playback for those
+  feeds. Permit cleartext so any subscribed podcast plays. App API traffic
+  (NER, OpenAI) is https regardless.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

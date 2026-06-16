@@ -13,6 +13,7 @@ import com.example.nerlan.data.DownloadManager
 import com.example.nerlan.data.DriveSync
 import com.example.nerlan.data.FavoritesStore
 import com.example.nerlan.data.ListeningStatsStore
+import com.example.nerlan.data.PodcastStore
 import com.example.nerlan.data.SettingsStore
 
 class NerLanApp : Application(), ImageLoaderFactory {
@@ -30,12 +31,15 @@ class NerLanApp : Application(), ImageLoaderFactory {
     private set
   lateinit var stats: ListeningStatsStore
     private set
+  lateinit var podcasts: PodcastStore
+    private set
 
   override fun onCreate() {
     super.onCreate()
     instance = this
     favorites = FavoritesStore(filesDir)
     downloads = DownloadManager(filesDir)
+    podcasts = PodcastStore(filesDir)
     settings = SettingsStore(this)
     ai = AIContentStore(this)
     stats = ListeningStatsStore(this)

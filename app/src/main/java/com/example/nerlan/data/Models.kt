@@ -121,16 +121,32 @@ data class Episode(
 data class EpisodeRecord(
   val id: String,           // episode id
   val title: String,
-  val playDate: String? = null,   // raw API date string (sortable)
+  val playDate: String? = null,   // ISO-8601 date string (sortable)
   val audio: String? = null,      // remote audio URL
   val programId: String,
   val programName: String,
   val language: String,
   val coverUrl: String? = null,
   val attachments: List<Attachment>? = null,   // optional: records saved before this field decode fine
+  // Optional so records persisted before they existed still decode without migration.
+  val durationSeconds: Int? = null,   // episode length, when known
+  val audioExt: String? = null,       // audio file extension ("mp3"/"m4a"); null ⇒ "mp3"
 ) {
   /** PDF attachments, the only kind we can render inline. */
   val pdfAttachments: List<Attachment> get() = attachments.orEmpty().filter { it.isPdf }
+
+  /** File extension to store the downloaded audio with (NER serves mp3). */
+  val audioFileExtension: String get() = audioExt ?: "mp3"
+
+  /** "H:MM:SS" for hour-plus episodes (common for podcasts), else "M:SS". */
+  val durationText: String
+    get() = durationSeconds?.takeIf { it > 0 }?.let {
+      val h = it / 3600; val m = (it % 3600) / 60; val s = it % 60
+      if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    } ?: ""
+
+  /** "2025-03-22T..." -> "2025/03/22" */
+  val releaseDateText: String get() = playDate?.take(10)?.replace("-", "/") ?: ""
 
   companion object {
     fun from(episode: Episode, program: Program) = EpisodeRecord(
@@ -143,6 +159,36 @@ data class EpisodeRecord(
       language = program.language,
       coverUrl = ChannelPlusApi.imageUrl(episode.image?.imageRef) ?: program.coverUrl,
       attachments = episode.attachments,
+      durationSeconds = episode.duration,
+      audioExt = null,   // NER audio is mp3
     )
   }
+}
+
+// MARK: Podcasts
+
+/**
+ * A subscribed podcast show plus the episodes parsed from its RSS feed. Unlike
+ * the NER [Program]/[Episode] types (whose URLs are built from Channel+ keys), a
+ * podcast carries plain absolute URLs. Episodes are pre-converted to
+ * [EpisodeRecord]s so playback/download/favorite/AI all work unchanged.
+ */
+@Serializable
+data class PodcastFeed(
+  val id: String,            // the RSS feed URL — stable identity + each episode's programId
+  val title: String,
+  val author: String? = null,
+  val description: String? = null,
+  val coverUrl: String? = null,
+  val language: String,
+  val episodes: List<EpisodeRecord> = emptyList(),
+) {
+  val feedUrl: String get() = id
+
+  /** Description often arrives as HTML; strip tags for display. */
+  val descriptionText: String
+    get() = (description ?: "")
+      .replace(Regex("<[^>]+>"), "")
+      .replace("&nbsp;", " ")
+      .trim()
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.example.nerlan.NerLanApp
 import java.io.File
+import kotlin.math.ceil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -218,10 +219,19 @@ class AIContentStore(private val context: Context) {
         val message = (_jobs.value[key(AiKind.TRANSCRIPT, record.id)] as? JobState.Failed)?.message
         throw Exception(message ?: "逐字稿失敗")
       }
-      setJob(k, JobState.Running("生成講義中…"))
-      val fragment = OpenAIService.generateHandout(
-        transcript, record, settings.chatModelOrDefault(), settings.apiKey.value)
-      handoutFile(record.id).writeText(fragment)
+      // Episodes longer than ~15 min are split into time-based parts, each its own
+      // Part I/II/III handout section; shorter ones stay a single handout.
+      val segments = handoutSegments(transcript, record.durationSeconds)
+      val fragments = mutableListOf<String>()
+      for ((i, segment) in segments.withIndex()) {
+        setJob(k, JobState.Running(
+          if (segments.size > 1) "生成講義中…（${i + 1}/${segments.size}）" else "生成講義中…"))
+        val partTitle = if (segments.size > 1) partTitle(i, segments.size, record.durationSeconds) else null
+        fragments += OpenAIService.generateHandout(
+          transcript = segment, record = record, partTitle = partTitle,
+          model = settings.chatModelOrDefault(), apiKey = settings.apiKey.value)
+      }
+      handoutFile(record.id).writeText(fragments.joinToString("\n"))
       noteRecord(record)
       clearJob(k)
     } catch (e: Exception) {
@@ -248,5 +258,66 @@ class AIContentStore(private val context: Context) {
     val cache = context.cacheDir
     chunks.forEach { if (it != source && it.parentFile == cache) it.delete() }
     if (source.parentFile == cache) source.delete()
+  }
+
+  companion object {
+    /** Each handout "Part" covers at most this many seconds of audio (~15 min). */
+    private const val HANDOUT_PART_SECONDS = 900
+
+    /**
+     * Split the transcript into one segment per ~15-minute part. Returns a single
+     * segment when the episode is ≤15 min (or its length is unknown and the
+     * transcript is short). Segments are balanced by character count and broken
+     * only at line (sentence) boundaries. Mirrors the iOS `handoutSegments`.
+     */
+    fun handoutSegments(transcript: String, durationSeconds: Int?): List<String> {
+      val parts = if (durationSeconds != null && durationSeconds > 0) {
+        maxOf(1, ceil(durationSeconds.toDouble() / HANDOUT_PART_SECONDS).toInt())
+      } else {
+        // Unknown duration: ~3500 chars ≈ 15 min of speech.
+        maxOf(1, ceil(transcript.length / 3500.0).toInt())
+      }
+      if (parts <= 1) return listOf(transcript)
+
+      val target = maxOf(1, transcript.length / parts)
+      val segments = mutableListOf<String>()
+      val current = StringBuilder()
+      var currentChars = 0
+      for (line in transcript.split("\n")) {
+        if (current.isNotEmpty()) current.append('\n')
+        current.append(line)
+        currentChars += line.length + 1
+        if (currentChars >= target && segments.size < parts - 1) {
+          segments += current.toString()
+          current.setLength(0)
+          currentChars = 0
+        }
+      }
+      if (current.isNotEmpty()) segments += current.toString()
+      return segments
+    }
+
+    /** "Part I（00:00–15:00）" — Roman numeral plus the part's audio time range
+     *  (range omitted when the duration is unknown). */
+    fun partTitle(index: Int, total: Int, duration: Int?): String {
+      val label = "Part ${romanNumeral(index + 1)}"
+      if (duration == null || duration <= 0) return label
+      val start = index * HANDOUT_PART_SECONDS
+      val end = if (index == total - 1) duration else (index + 1) * HANDOUT_PART_SECONDS
+      return "$label（${timeStamp(start)}–${timeStamp(end)}）"
+    }
+
+    private fun timeStamp(seconds: Int): String {
+      val h = seconds / 3600; val m = (seconds % 3600) / 60; val s = seconds % 60
+      return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%d:%02d".format(m, s)
+    }
+
+    private fun romanNumeral(value: Int): String {
+      val table = listOf(10 to "X", 9 to "IX", 5 to "V", 4 to "IV", 1 to "I")
+      var n = value
+      val sb = StringBuilder()
+      for ((v, r) in table) while (n >= v) { sb.append(r); n -= v }
+      return sb.toString()
+    }
   }
 }

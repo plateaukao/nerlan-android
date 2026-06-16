@@ -125,22 +125,42 @@ object OpenAIService {
 
   // MARK: Handout (chat completion)
 
-  /** Produce an HTML study-handout *fragment* from a transcript. */
-  suspend fun generateHandout(transcript: String, record: EpisodeRecord, model: String, apiKey: String): String {
+  /**
+   * Produce an HTML study-handout *fragment* from a transcript.
+   *
+   * [partTitle] is set when an episode is split into ~15-minute parts: the
+   * fragment is prefixed with a "Part …" heading and its four section headings
+   * drop to `h3` (nested under the part), so the document reads Part I →
+   * 內容說明/文法重點/例句/單字, Part II → …. When null (≤15 min) the four
+   * sections are top-level `h2`.
+   */
+  suspend fun generateHandout(
+    transcript: String,
+    record: EpisodeRecord,
+    partTitle: String? = null,
+    model: String,
+    apiKey: String,
+  ): String {
     if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
+    val tag = if (partTitle == null) "h2" else "h3"
+    val partNote = if (partTitle == null) ""
+      else "你收到的是整集節目其中一段（約 15 分鐘）的逐字稿，請只根據這一段的內容製作講義。"
     val system = buildString {
       append("你是一位專業的語言老師，正在為「${record.language}」語言學習教材製作複習講義。")
-      append("你會收到一集廣播節目的逐字稿，請根據內容整理出一份適合學生複習的講義。")
+      append(partNote)
+      append("你會收到一段廣播節目的逐字稿，請根據內容整理出一份適合學生複習的講義。")
       append("說明文字一律使用「台灣繁體中文（正體字）」，絕對不要使用簡體字；例句與單字中的外語請保留原貌（不要翻譯或改成中文字）。")
-      append("並使用 HTML 格式輸出，分成三個區塊：")
-      append("<h2>文法重點</h2>（列出本集出現的文法句型，附簡短解說）、")
-      append("<h2>例句</h2>（從內容中挑選實用例句，逐句附上中文翻譯）、")
-      append("<h2>單字</h2>（重要單字表，含發音或拼音與中文意思，建議用表格呈現）。")
-      append("只輸出 HTML 內容片段（可使用 h2、h3、p、ul、ol、li、table、tr、th、td、strong、em、ruby 等標籤），")
+      append("並使用 HTML 格式輸出，依序分成四個區塊：")
+      append("<$tag>內容說明</$tag>（用幾句話說明這段內容的主題與大意）、")
+      append("<$tag>文法重點</$tag>（列出出現的文法句型，附簡短解說）、")
+      append("<$tag>例句</$tag>（從內容中挑選實用例句，逐句附上中文翻譯）、")
+      append("<$tag>單字</$tag>（重要單字表，含發音或拼音與中文意思，建議用表格呈現）。")
+      append("只輸出 HTML 內容片段（可使用 h2、h3、h4、p、ul、ol、li、table、tr、th、td、strong、em、ruby 等標籤），")
       append("不要輸出 <html>、<head>、<body> 標籤，也不要使用 Markdown 或程式碼圍欄。")
     }
     val user = "節目：${record.programName}\n單集：${record.title}\n\n逐字稿：\n$transcript"
-    return stripCodeFence(chat(system, user, model, apiKey))
+    val fragment = stripCodeFence(chat(system, user, model, apiKey))
+    return if (partTitle == null) fragment else "<h2>$partTitle</h2>\n$fragment"
   }
 
   // MARK: Helpers

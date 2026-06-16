@@ -10,10 +10,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -103,6 +108,14 @@ fun RecordRow(
   queue: List<EpisodeRecord>,
   onDelete: (() -> Unit)? = null,
   aiReadyOnly: Boolean = false,
+  // Podcast detail turns these on for inline favorite + download (like the NER
+  // episode list). Off everywhere else, so Downloads/Favorites/AI rows are unchanged.
+  showFavorite: Boolean = false,
+  showDownload: Boolean = false,
+  // Replaces the "program · language" subtitle (podcast rows show date · duration).
+  subtitleOverride: String? = null,
+  // Podcast episode list turns AI icons off, matching the NER episode list.
+  showAI: Boolean = true,
 ) {
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
@@ -132,7 +145,7 @@ fun RecordRow(
         overflow = TextOverflow.Ellipsis,
       )
       Text(
-        "${record.programName} · ${record.language}",
+        subtitleOverride ?: "${record.programName} · ${record.language}",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -143,6 +156,8 @@ fun RecordRow(
       tint = MaterialTheme.colorScheme.primary,
       modifier = Modifier.size(20.dp),
     )
+    if (showFavorite) RowFavoriteButton(record)
+    if (showDownload) RowDownloadButton(record)
     if (record.pdfAttachments.isNotEmpty()) {
       IconButton(onClick = {
         if (panel != null) panel.item = StudyItem.Attachment(record) else showAttachment = true
@@ -151,14 +166,16 @@ fun RecordRow(
           tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
       }
     }
-    if (aiReadyOnly) {
-      val hasTranscript = remember(revision, record.id) { ai.hasTranscript(record.id) }
-      val hasHandout = remember(revision, record.id) { ai.hasHandout(record.id) }
-      if (hasTranscript) AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
-      if (hasHandout) AiActionButton(AiKind.HANDOUT, record, compact = true)
-    } else if (apiKey.isNotBlank()) {
-      AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
-      AiActionButton(AiKind.HANDOUT, record, compact = true)
+    if (showAI) {
+      if (aiReadyOnly) {
+        val hasTranscript = remember(revision, record.id) { ai.hasTranscript(record.id) }
+        val hasHandout = remember(revision, record.id) { ai.hasHandout(record.id) }
+        if (hasTranscript) AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
+        if (hasHandout) AiActionButton(AiKind.HANDOUT, record, compact = true)
+      } else if (apiKey.isNotBlank()) {
+        AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
+        AiActionButton(AiKind.HANDOUT, record, compact = true)
+      }
     }
     if (onDelete != null) {
       IconButton(onClick = onDelete) {
@@ -174,5 +191,44 @@ fun RecordRow(
       attachments = record.pdfAttachments,
       onDismiss = { showAttachment = false },
     )
+  }
+}
+
+/** Inline favorite heart (podcast detail rows). Collects favorites only here so
+ *  it's free for rows that don't show it. */
+@Composable
+private fun RowFavoriteButton(record: EpisodeRecord) {
+  val favorites = NerLanApp.instance.favorites
+  val favs by favorites.episodes.collectAsState()
+  val isFav = favs.any { it.id == record.id }
+  IconButton(onClick = { favorites.toggle(record) }) {
+    Icon(
+      if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+      contentDescription = "收藏",
+      tint = MaterialTheme.colorScheme.error,
+    )
+  }
+}
+
+/** Inline download button mirroring EpisodeRow's three states. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RowDownloadButton(record: EpisodeRecord) {
+  val downloads = NerLanApp.instance.downloads
+  val progressMap by downloads.progress.collectAsState()
+  val downloadRecords by downloads.records.collectAsState()
+  val isDownloaded = downloadRecords.any { it.id == record.id } || downloads.isDownloaded(record.id)
+  val progress = progressMap[record.id]
+  Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+    when {
+      isDownloaded -> Icon(
+        Icons.Filled.CheckCircle, contentDescription = "已下載",
+        tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp),
+      )
+      progress != null -> CircularWavyProgressIndicator(progress = { progress }, modifier = Modifier.size(24.dp))
+      else -> IconButton(onClick = { downloads.download(record) }, enabled = record.audio != null) {
+        Icon(Icons.Filled.ArrowDownward, contentDescription = "下載")
+      }
+    }
   }
 }

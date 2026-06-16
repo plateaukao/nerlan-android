@@ -47,6 +47,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.nerlan.data.PodcastFeed
 import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
 
@@ -61,6 +62,7 @@ fun MainScreen() {
   var tab by rememberSaveable { mutableIntStateOf(0) }
   // per-tab pushed program detail (single-level stack, like the iOS app in practice)
   var programsDetail by remember { mutableStateOf<Program?>(null) }
+  var podcastDetail by remember { mutableStateOf<PodcastFeed?>(null) }
   var favoritesDetail by remember { mutableStateOf<Program?>(null) }
   var showPlayerSheet by remember { mutableStateOf(false) }
   var leftCollapsed by remember { mutableStateOf(false) }
@@ -108,9 +110,15 @@ fun MainScreen() {
         // composed, so switching tabs or opening/closing a program never
         // re-fetches or resets filters/scroll. Only the active tab is drawn.
         TabContainer(tab == 0) {
-          ProgramListScreen(onProgramClick = { programsDetail = it })
+          ProgramListScreen(
+            onProgramClick = { programsDetail = it },
+            onPodcastClick = { podcastDetail = it },
+          )
           programsDetail?.let { program ->
             ProgramDetailScreen(program, onBack = { programsDetail = null })
+          }
+          podcastDetail?.let { feed ->
+            PodcastDetailScreen(feed, onBack = { podcastDetail = null })
           }
         }
         TabContainer(tab == 1) {

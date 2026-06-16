@@ -46,17 +46,25 @@ class DownloadManager(filesDir: File) {
   private val _progress = MutableStateFlow<Map<String, Float>>(emptyMap())
   val progress: StateFlow<Map<String, Float>> = _progress
 
-  private fun fileFor(episodeId: String) = File(audioDir, "$episodeId.mp3")
+  /** Extensions an episode might be stored under: NER is always mp3, podcasts can
+   *  be m4a/aac/etc. Probed in order, so the mp3 common case hits first. */
+  private val audioExtensions = listOf("mp3", "m4a", "aac", "ogg", "opus", "wav", "mp4")
+
+  /** Where an episode's audio is stored, using its declared extension. */
+  private fun audioFileFor(record: EpisodeRecord) = File(audioDir, "${record.id}.${record.audioFileExtension}")
+
+  /** The downloaded audio file for an id, whatever extension it was saved with. */
+  private fun existingAudioFile(episodeId: String): File? =
+    audioExtensions.asSequence().map { File(audioDir, "$episodeId.$it") }.firstOrNull { it.exists() }
 
   private fun attachmentFileFor(attachment: Attachment) =
     File(attachmentsDir, "${attachment.attachmentKey}.${attachment.fileExtension}")
 
-  fun isDownloaded(episodeId: String) = fileFor(episodeId).exists()
+  fun isDownloaded(episodeId: String) = existingAudioFile(episodeId) != null
 
   fun isDownloading(episodeId: String) = _progress.value.containsKey(episodeId)
 
-  fun localPath(episodeId: String): String? =
-    fileFor(episodeId).takeIf { it.exists() }?.absolutePath
+  fun localPath(episodeId: String): String? = existingAudioFile(episodeId)?.absolutePath
 
   /** Local copy of an attachment, if it has been downloaded. */
   fun localAttachmentPath(attachment: Attachment): String? =
@@ -73,7 +81,7 @@ class DownloadManager(filesDir: File) {
     _progress.value += (record.id to 0f)
     scope.launch {
       audioSemaphore.withPermit {
-        val dest = fileFor(record.id)
+        val dest = audioFileFor(record)
         val tmp = File(dest.path + ".part")
         var lastStep = -1
         try {
@@ -154,7 +162,7 @@ class DownloadManager(filesDir: File) {
   fun attachmentCount(): Int = attachmentsDir.listFiles()?.count { it.isFile } ?: 0
 
   fun delete(episodeId: String) {
-    fileFor(episodeId).delete()
+    existingAudioFile(episodeId)?.delete()
     _records.value.firstOrNull { it.id == episodeId }?.attachments.orEmpty().forEach {
       attachmentFileFor(it).delete()
     }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -29,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.nerlan.data.ChannelPlusApi
 import com.example.nerlan.data.LanguageGroup
+import com.example.nerlan.data.PodcastFeed
 import com.example.nerlan.data.Program
 
 /**
@@ -51,8 +54,10 @@ import com.example.nerlan.data.Program
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
+fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (PodcastFeed) -> Unit) {
   val catalog = com.example.nerlan.NerLanApp.instance.catalog
+  val podcasts = com.example.nerlan.NerLanApp.instance.podcasts
+  val feeds by podcasts.feeds.collectAsState()
   val scope = rememberCoroutineScope()
   var groups by remember { mutableStateOf<List<LanguageGroup>>(emptyList()) }
   var selectedLanguage by remember { mutableStateOf<String?>(null) }
@@ -60,6 +65,7 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
   var isRefreshing by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
   var showSettings by remember { mutableStateOf(false) }
+  var showAddPodcast by remember { mutableStateOf(false) }
 
   fun group(programs: List<Program>) =
     programs.groupBy { it.language }.map { (lang, progs) -> LanguageGroup(lang, progs) }
@@ -125,6 +131,9 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
               fontWeight = FontWeight.Bold,
               modifier = Modifier.weight(1f),
             )
+            IconButton(onClick = { showAddPodcast = true }) {
+              Icon(Icons.Filled.Add, contentDescription = "新增 Podcast")
+            }
             IconButton(onClick = { showSettings = true }) {
               Icon(Icons.Filled.Settings, contentDescription = "設定")
             }
@@ -142,6 +151,21 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
                 selectedLanguage = group.language
               }
             }
+          }
+        }
+        // Subscribed podcasts pinned above the NER catalog, in the unfiltered
+        // ("全部") view only so a language filter stays clean.
+        if (selectedLanguage == null && feeds.isNotEmpty()) {
+          item(key = "podcast-header") {
+            Text(
+              "我的 Podcast",
+              style = MaterialTheme.typography.titleSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
+            )
+          }
+          items(feeds.size, key = { "podcast-${feeds[it].id}" }) { i ->
+            PodcastRow(feeds[i], onClick = { onPodcastClick(feeds[i]) })
           }
         }
         visibleGroups.forEach { group ->
@@ -163,6 +187,9 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit) {
 
   if (showSettings) {
     SettingsScreen(onDismiss = { showSettings = false })
+  }
+  if (showAddPodcast) {
+    AddPodcastDialog(onDismiss = { showAddPodcast = false })
   }
 }
 
@@ -215,6 +242,43 @@ fun ProgramRow(program: Program, onClick: () -> Unit) {
             modifier = Modifier.padding(start = 6.dp),
           )
         }
+      }
+    }
+  }
+}
+
+/** Row for a subscribed podcast in the "我的 Podcast" section (mirrors ProgramRow). */
+@Composable
+fun PodcastRow(feed: PodcastFeed, onClick: () -> Unit) {
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick)
+      .padding(horizontal = 16.dp, vertical = 8.dp),
+  ) {
+    CoverImage(feed.coverUrl, 56.dp)
+    Column(Modifier.padding(start = 12.dp)) {
+      Text(
+        feed.title,
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
+        maxLines = 2,
+      )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        feed.author?.takeIf { it.isNotEmpty() }?.let { author ->
+          Text(
+            author,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        Text(
+          "共 ${feed.episodes.size} 集",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.padding(start = 6.dp),
+        )
       }
     }
   }

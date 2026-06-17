@@ -1,8 +1,8 @@
 package com.example.nerlan.data
 
 import android.content.Context
+import android.content.Intent
 import com.example.nerlan.NerLanApp
-import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -52,7 +52,11 @@ class DriveSync(private val context: Context) {
   private val json = Json { ignoreUnknownKeys = true }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-  private val _accountEmail = MutableStateFlow(GoogleSignIn.getLastSignedInAccount(context)?.email)
+  /** Token source: GMS when it works, browser OAuth when it doesn't. The sync
+   *  engine below is agnostic to which one produced the access token. */
+  private val auth = DriveAuth(context)
+
+  private val _accountEmail = MutableStateFlow(auth.email)
   val accountEmail: StateFlow<String?> = _accountEmail
 
   /** Human-readable last-sync status for the settings screen. */
@@ -60,8 +64,42 @@ class DriveSync(private val context: Context) {
   val status: StateFlow<String?> = _status
 
   fun onSignedIn(account: GoogleSignInAccount) {
+    // A successful GMS sign-in means the broker works; clear any sticky browser
+    // fallback so this device prefers GMS again.
+    auth.resetToAuto()
     _accountEmail.value = account.email
     syncNow()
+  }
+
+  // MARK: - Browser OAuth fallback (GMS-less devices)
+
+  /** Whether the browser sign-in path is configured (gradle placeholders filled). */
+  val browserAuthConfigured: Boolean get() = auth.browserConfigured
+
+  /** Intent that opens Google's consent page in a Custom Tab or the default
+   *  browser, or null if the request can't be built (e.g. the device has no
+   *  browser at all — AppAuth throws ActivityNotFoundException). Settings launches
+   *  it via `StartActivityForResult`. */
+  fun browserSignInIntent(): Intent? = try {
+    auth.browserAuthIntent()
+  } catch (e: Exception) {
+    _status.value = "無法開啟瀏覽器登入：${e.message}"
+    null
+  }
+
+  /** Classify a GMS sign-in failure so the UI can auto-offer the browser flow when
+   *  the broker is structurally dead (the A7), but not on config/network errors. */
+  fun classifyGmsSignIn(t: Throwable): GmsFailure = auth.classify(t)
+
+  /** Complete the browser redirect (token exchange); kicks off a sync on success. */
+  suspend fun completeBrowserSignIn(data: Intent?) {
+    _status.value = "登入中…"
+    if (auth.completeBrowserSignIn(data)) {
+      _accountEmail.value = auth.email
+      syncNow()
+    } else {
+      _status.value = "瀏覽器登入失敗"
+    }
   }
 
   /** Surface a failed sign-in (e.g. code 10 = DEVELOPER_ERROR when the OAuth
@@ -74,7 +112,7 @@ class DriveSync(private val context: Context) {
   }
 
   fun signOut() {
-    signInClient(context).signOut()
+    auth.signOut()
     _accountEmail.value = null
     _status.value = null
   }
@@ -108,7 +146,13 @@ class DriveSync(private val context: Context) {
       .onSuccess { (up, down) -> _status.value = "已同步（↑$up ↓$down）" }
       .onFailure {
         _status.value = when (it) {
-          is UserRecoverableAuthException -> "需要重新授權，請重新登入"
+          // GMS needs re-consent, or the browser session expired (which already
+          // cleared itself). Refresh the email so a cleared browser session flips
+          // the UI back to the login button.
+          is UserRecoverableAuthException, is ReauthRequired -> {
+            _accountEmail.value = auth.email
+            "需要重新授權，請重新登入"
+          }
           else -> "同步失敗：${it.message}"
         }
       }
@@ -116,9 +160,8 @@ class DriveSync(private val context: Context) {
 
   // MARK: - Sync engine
 
-  private fun sync(): Pair<Int, Int> {
-    val account = GoogleSignIn.getLastSignedInAccount(context)?.account ?: error("尚未登入 Google 帳戶")
-    val token = GoogleAuthUtil.getToken(context, account, "oauth2:$SCOPE")
+  private suspend fun sync(): Pair<Int, Int> {
+    val token = auth.accessToken()
     val remote = listFiles(token).associateBy { it.name }
     var pushed = 0
     var pulled = 0

@@ -13,6 +13,17 @@ android {
         targetSdk = 36
         versionCode = 3
         versionName = "1.2"
+
+        // Browser OAuth (AppAuth) for Drive sync on GMS-less devices. Replace the
+        // REPLACE_* placeholders with the custom-scheme OAuth client created in the
+        // SAME GCP project as the Android client (so the appDataFolder is shared
+        // with the GMS sign-in path). The redirect scheme is the reversed client ID,
+        // e.g. com.googleusercontent.apps.123456789-abc.
+        val driveOauthClientId = "297018645967-rt0483lsudd5k2ssncio8mtqak8537pu.apps.googleusercontent.com"
+        val driveOauthRedirectScheme = "com.googleusercontent.apps.297018645967-rt0483lsudd5k2ssncio8mtqak8537pu"
+        manifestPlaceholders["appAuthRedirectScheme"] = driveOauthRedirectScheme
+        buildConfigField("String", "DRIVE_OAUTH_CLIENT_ID", "\"$driveOauthClientId\"")
+        buildConfigField("String", "DRIVE_OAUTH_REDIRECT", "\"$driveOauthRedirectScheme:/oauth2redirect\"")
     }
 
     buildTypes {
@@ -29,7 +40,7 @@ android {
     buildFeatures {
       compose = true
       aidl = false
-      buildConfig = false
+      buildConfig = true
       shaders = false
     }
 
@@ -100,4 +111,6 @@ dependencies {
 
   // Google sign-in + Drive appDataFolder sync (REST over OkHttp)
   implementation(libs.play.services.auth)
+  // Browser OAuth 2.0 + PKCE fallback for devices without Google Play Services
+  implementation(libs.appauth)
 }

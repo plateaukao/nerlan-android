@@ -33,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,10 +46,12 @@ import androidx.compose.ui.window.DialogProperties
 import android.text.format.Formatter
 import com.example.nerlan.NerLanApp
 import com.example.nerlan.data.DriveSync
+import com.example.nerlan.data.GmsFailure
 import com.example.nerlan.data.SettingsStore
 import com.example.nerlan.player.AudioCache
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.launch
 
 /**
  * OpenAI credentials & model configuration, shown as a full-screen dialog from
@@ -68,6 +71,12 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   val syncToDrive by settings.syncToDrive.collectAsState()
   val driveEmail by drive.accountEmail.collectAsState()
   val driveStatus by drive.status.collectAsState()
+  val scope = rememberCoroutineScope()
+  val browserSignInLauncher = rememberLauncherForActivityResult(
+    ActivityResultContracts.StartActivityForResult(),
+  ) { result ->
+    scope.launch { drive.completeBrowserSignIn(result.data) }
+  }
   val signInLauncher = rememberLauncherForActivityResult(
     ActivityResultContracts.StartActivityForResult(),
   ) { result ->
@@ -75,7 +84,16 @@ fun SettingsScreen(onDismiss: () -> Unit) {
       val account = GoogleSignIn.getSignedInAccountFromIntent(result.data).getResult(ApiException::class.java)
       drive.onSignedIn(account)
     } catch (e: ApiException) {
-      drive.reportSignInError(e.statusCode)
+      val failure = drive.classifyGmsSignIn(e)
+      // The user backing out of the picker isn't an error — say nothing.
+      if (failure != GmsFailure.CANCELLED) {
+        drive.reportSignInError(e.statusCode)
+        // A structurally dead broker (the A7) — not config/network/cancel — means GMS
+        // can't ever complete here; auto-offer the browser flow if it's configured.
+        if (drive.browserAuthConfigured && failure == GmsFailure.BROKEN) {
+          drive.browserSignInIntent()?.let { browserSignInLauncher.launch(it) }
+        }
+      }
     }
   }
   var showClearConfirm by remember { mutableStateOf(false) }
@@ -195,6 +213,15 @@ fun SettingsScreen(onDismiss: () -> Unit) {
           if (driveEmail == null) {
             Button(onClick = { signInLauncher.launch(DriveSync.signInClient(context).signInIntent) }) {
               Text("使用 Google 帳戶登入")
+            }
+            // Manual escape for devices with broken/absent Google Play Services
+            // (auto-classification can't always tell a dead broker from bad network).
+            if (drive.browserAuthConfigured) {
+              TextButton(onClick = {
+                drive.browserSignInIntent()?.let { browserSignInLauncher.launch(it) }
+              }) {
+                Text("改用瀏覽器登入（無 Google Play 服務）")
+              }
             }
           } else {
             Text("已登入：$driveEmail", style = MaterialTheme.typography.bodyMedium)

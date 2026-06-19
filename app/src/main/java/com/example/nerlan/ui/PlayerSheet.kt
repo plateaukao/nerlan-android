@@ -1,16 +1,19 @@
 package com.example.nerlan.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Favorite
@@ -47,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -60,6 +64,7 @@ import com.example.nerlan.player.PlayerManager
 fun PlayerSheet(onDismiss: () -> Unit) {
   val favorites = NerLanApp.instance.favorites
   val downloads = NerLanApp.instance.downloads
+  val ai = NerLanApp.instance.ai
   val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
   val panel = LocalStudyPanel.current
   val current by PlayerManager.current.collectAsState()
@@ -73,38 +78,68 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   val favEpisodes by favorites.episodes.collectAsState()
   val progressMap by downloads.progress.collectAsState()
   val downloadRecords by downloads.records.collectAsState()
+  val aiRevision by ai.revision.collectAsState()
 
   var isScrubbing by remember { mutableStateOf(false) }
   var scrubPosition by remember { mutableFloatStateOf(0f) }
   var speedMenuOpen by remember { mutableStateOf(false) }
   var showAttachment by remember { mutableStateOf(false) }
 
+  // Timestamp cues for the playing episode's transcript, when one exists. A
+  // non-empty list enables the caption (字幕) toggle, which swaps the cover/title
+  // block for the synced transcript view. Reset per-episode so each starts on
+  // the cover.
+  val captionCues = remember(current?.id, aiRevision) {
+    current?.id?.let { id -> if (ai.hasTranscript(id)) ai.transcriptCues(id) else null }
+  }
+  val captionsAvailable = !captionCues.isNullOrEmpty()
+  var captionMode by remember(current?.id) { mutableStateOf(false) }
+
   // Open fully expanded so transport controls aren't cropped at half height.
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
     val record = current ?: return@ModalBottomSheet
+    // In caption mode the transcript takes the slack above the controls, so the
+    // column must fill the sheet height for weight(1f) to resolve.
+    val showCaptions = captionMode && captionsAvailable
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+      modifier = Modifier
+        .fillMaxWidth()
+        .then(if (showCaptions) Modifier.fillMaxHeight() else Modifier)
+        .padding(horizontal = 24.dp, vertical = 8.dp),
     ) {
-      CoverImage(record.coverUrl, 200.dp)
-      Text(
-        record.title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        textAlign = TextAlign.Center,
-        modifier = Modifier.padding(top = 16.dp),
-      )
-      Text(
-        record.programName,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Text(
-        record.language,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.outline,
-      )
+      if (showCaptions) {
+        // Take over the cover/title/program/language area with the synced
+        // transcript; its Close button (and the 字幕 toggle) exit caption mode.
+        Box(Modifier.fillMaxWidth().weight(1f)) {
+          TranscriptContent(
+            record,
+            remember(record.id, aiRevision) { ai.transcriptText(record.id).orEmpty() },
+            onClose = { captionMode = false },
+            cues = captionCues,
+          )
+        }
+      } else {
+        CoverImage(record.coverUrl, 200.dp)
+        Text(
+          record.title,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.padding(top = 16.dp),
+        )
+        Text(
+          record.programName,
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(
+          record.language,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.outline,
+        )
+      }
 
       // Scrubber
       Slider(
@@ -258,13 +293,33 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         }
       }
 
-      // AI tools (transcript / handout) — only once an API key is set.
+      // AI tools (caption / transcript / handout) — only once an API key is set.
       if (apiKey.isNotBlank()) {
         Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),
           modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
         ) {
+          // Caption toggle: only when the transcript carries timestamps, so the
+          // synced transcript view has cues to highlight/scroll.
+          if (captionsAvailable) {
+            Row(
+              modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable { captionMode = !captionMode }
+                .padding(horizontal = 6.dp, vertical = 8.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Icon(
+                Icons.Filled.ClosedCaption,
+                contentDescription = "字幕",
+                tint = if (captionMode) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+              )
+              Text("字幕", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+            }
+          }
           AiActionButton(AiKind.TRANSCRIPT, record, compact = false, onOpenedInPanel = onDismiss)
           AiActionButton(AiKind.HANDOUT, record, compact = false, onOpenedInPanel = onDismiss)
         }

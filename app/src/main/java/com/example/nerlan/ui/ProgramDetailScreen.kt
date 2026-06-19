@@ -19,8 +19,6 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -261,7 +259,6 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
   val favorites = NerLanApp.instance.favorites
   val downloads = NerLanApp.instance.downloads
   val current by PlayerManager.current.collectAsState()
-  val isPlaying by PlayerManager.isPlaying.collectAsState()
   val favEpisodes by favorites.episodes.collectAsState()
   val progressMap by downloads.progress.collectAsState()
   val downloadRecords by downloads.records.collectAsState()
@@ -281,13 +278,7 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
       }
       .padding(horizontal = 16.dp, vertical = 8.dp),
   ) {
-    Icon(
-      if (isCurrent && isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-      contentDescription = null,
-      tint = if (playable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-      modifier = Modifier.size(28.dp),
-    )
-    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+    Column(Modifier.weight(1f)) {
       Text(
         episode.displayTitle,
         style = MaterialTheme.typography.bodyMedium,

@@ -16,8 +16,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -118,7 +116,6 @@ fun RecordRow(
   showAI: Boolean = true,
 ) {
   val current by PlayerManager.current.collectAsState()
-  val isPlaying by PlayerManager.isPlaying.collectAsState()
   val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
   val ai = NerLanApp.instance.ai
   val revision by ai.revision.collectAsState()
@@ -150,12 +147,6 @@ fun RecordRow(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
     }
-    Icon(
-      if (isCurrent && isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-      contentDescription = null,
-      tint = MaterialTheme.colorScheme.primary,
-      modifier = Modifier.size(20.dp),
-    )
     if (showFavorite) RowFavoriteButton(record)
     if (showDownload) RowDownloadButton(record)
     if (record.pdfAttachments.isNotEmpty()) {

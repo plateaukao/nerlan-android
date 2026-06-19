@@ -1,6 +1,9 @@
 package com.example.nerlan.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -50,6 +53,7 @@ import com.example.nerlan.data.EpisodeRecord
 import com.example.nerlan.data.SettingsStore
 import com.example.nerlan.data.TranscriptCue
 import com.example.nerlan.player.PlayerManager
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Read-only transcript viewer shown as a full-screen dialog over the player. The
@@ -102,6 +106,7 @@ fun TranscriptContent(
 
   val fontScale by settings.transcriptFontScale.collectAsState()
   val translationLanguage by settings.translationLanguage.collectAsState()
+  val scrollAnimated by settings.transcriptScrollAnimated.collectAsState()
   val translationJobs by ai.translationJobs.collectAsState()
   val revision by ai.revision.collectAsState()
 
@@ -156,8 +161,76 @@ fun TranscriptContent(
     }
   }
 
-  LaunchedEffect(activeIndex) {
-    if (activeIndex >= 0) listState.animateScrollToItem(activeIndex)
+  // Keep the spoken sentence centered in the viewport (LazyColumn has no center
+  // anchor, so centering means a scroll offset of half the leftover space; cf.
+  // iOS `scrollTo(anchor: .center)`). Two modes, chosen by scrollAnimated:
+  //
+  //  • Animated (default, normal phones) — a teleprompter-style *continuous*
+  //    drift: every 0.5s position tick re-targets so the active line glides
+  //    toward center over the sentence's own duration, with no jump at the
+  //    sentence boundary. collectLatest cancels the in-flight animation when the
+  //    next tick arrives, so the motion keeps re-aiming smoothly.
+  //  • Off (e-ink) — an instant jump that centers each sentence once, when it
+  //    becomes active. e-ink disables animations system-wide anyway, and a
+  //    continuous scroll would smear/ghost.
+  if (scrollAnimated) {
+    LaunchedEffect(cues, episodeId) {
+      val c = cues
+      if (c.isNullOrEmpty()) return@LaunchedEffect
+      PlayerManager.positionMs.collectLatest { pos ->
+        if (PlayerManager.current.value?.id != episodeId) return@collectLatest
+        val t = pos / 1000.0 + 0.05
+        // Last cue whose start is at or before now.
+        var lo = 0; var hi = c.size - 1; var i = -1
+        while (lo <= hi) {
+          val mid = (lo + hi) / 2
+          if (c[mid].start <= t) { i = mid; lo = mid + 1 } else hi = mid - 1
+        }
+        if (i < 0) return@collectLatest
+        val info = listState.layoutInfo
+        val cur = info.visibleItemsInfo.firstOrNull { it.index == i }
+        if (cur == null) {
+          // Off-screen (e.g. after a seek): snap it roughly to center; the next
+          // tick drifts precisely once its height is measured.
+          listState.scrollToItem(i, -(info.viewportEndOffset - info.viewportStartOffset) / 2)
+          return@collectLatest
+        }
+        val vpCenter = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+        val curCenter = cur.offset + cur.size / 2f
+        // Interpolate the anchor from this sentence's center toward the next as
+        // playback advances through the sentence, so the scroll is continuous.
+        val next = info.visibleItemsInfo.firstOrNull { it.index == i + 1 }
+        val anchor = if (next != null && i + 1 < c.size) {
+          val span = c[i + 1].start - c[i].start
+          val p = if (span > 0) ((t - c[i].start) / span).coerceIn(0.0, 1.0).toFloat() else 0f
+          val nextCenter = next.offset + next.size / 2f
+          curCenter + p * (nextCenter - curCenter)
+        } else {
+          curCenter
+        }
+        val delta = anchor - vpCenter
+        if (kotlin.math.abs(delta) > 1f) {
+          listState.animateScrollBy(delta, tween(durationMillis = 500, easing = LinearEasing))
+        }
+      }
+    }
+  } else {
+    LaunchedEffect(activeIndex) {
+      if (activeIndex < 0) return@LaunchedEffect
+      fun centerOffset(): Int? {
+        val info = listState.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == activeIndex } ?: return null
+        val viewport = info.viewportEndOffset - info.viewportStartOffset
+        return -(viewport - item.size) / 2
+      }
+      val off = centerOffset()
+      if (off != null) {
+        listState.scrollToItem(activeIndex, off)
+      } else {
+        listState.scrollToItem(activeIndex)
+        centerOffset()?.let { listState.scrollToItem(activeIndex, it) }
+      }
+    }
   }
 
   fun cycleTranslate() {

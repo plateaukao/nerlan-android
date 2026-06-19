@@ -69,6 +69,7 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   val transcriptionModel by settings.transcriptionModel.collectAsState()
   val cacheStreamedAudio by settings.cacheStreamedAudio.collectAsState()
   val translationLanguage by settings.translationLanguage.collectAsState()
+  val scrollAnimated by settings.transcriptScrollAnimated.collectAsState()
   val syncToDrive by settings.syncToDrive.collectAsState()
   val driveEmail by drive.accountEmail.collectAsState()
   val driveStatus by drive.status.collectAsState()
@@ -217,6 +218,23 @@ fun SettingsScreen(onDismiss: () -> Unit) {
           }
           Text(
             "逐字稿畫面的「翻譯」按鈕會把內容翻譯成這個語言（使用你的 OpenAI 額度，並會同步）。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+          )
+
+          Spacer(Modifier.height(16.dp))
+          Text("逐字稿", style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 4.dp))
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Text("置中捲動動畫", modifier = Modifier.weight(1f))
+            Switch(checked = scrollAnimated, onCheckedChange = settings::setTranscriptScrollAnimated)
+          }
+          Text(
+            "播放時將朗讀中的句子平滑捲動到畫面中央。電子紙裝置建議關閉，以避免殘影。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

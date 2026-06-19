@@ -41,6 +41,12 @@ class SettingsStore(context: Context) {
     MutableStateFlow(prefs.getString(KEY_TRANSLATION_LANG, DEFAULT_TRANSLATION_LANGUAGE)!!)
   val translationLanguage: StateFlow<String> = _translationLanguage
 
+  /** When on, the transcript smoothly animates the spoken sentence to the center
+   *  of the screen; off jumps to it instantly. On by default — turn off on e-ink
+   *  devices, where the scroll animation smears/ghosts. */
+  private val _transcriptScrollAnimated = MutableStateFlow(prefs.getBoolean(KEY_SCROLL_ANIM, true))
+  val transcriptScrollAnimated: StateFlow<Boolean> = _transcriptScrollAnimated
+
   fun setApiKey(value: String) {
     _apiKey.value = value
     prefs.edit().putString(KEY_API, value).apply()
@@ -77,6 +83,11 @@ class SettingsStore(context: Context) {
     prefs.edit().putString(KEY_TRANSLATION_LANG, value).apply()
   }
 
+  fun setTranscriptScrollAnimated(value: Boolean) {
+    _transcriptScrollAnimated.value = value
+    prefs.edit().putBoolean(KEY_SCROLL_ANIM, value).apply()
+  }
+
   /** Model names coerced away from blank for actual API calls. */
   fun chatModelOrDefault() = _chatModel.value.ifBlank { DEFAULT_CHAT_MODEL }
   fun transcriptionModelOrDefault() = _transcriptionModel.value.ifBlank { DEFAULT_TRANSCRIPTION_MODEL }
@@ -108,5 +119,6 @@ class SettingsStore(context: Context) {
     private const val KEY_SYNC_DRIVE = "sync_to_drive"
     private const val KEY_FONT_SCALE = "transcript_font_scale"
     private const val KEY_TRANSLATION_LANG = "translation_language"
+    private const val KEY_SCROLL_ANIM = "transcript_scroll_animated"
   }
 }

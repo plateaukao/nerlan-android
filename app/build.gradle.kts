@@ -11,8 +11,8 @@ android {
         applicationId = "com.danielkao.nerlan"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
 
         // Browser OAuth (AppAuth) for Drive sync on GMS-less devices. Replace the
         // REPLACE_* placeholders with the custom-scheme OAuth client created in the

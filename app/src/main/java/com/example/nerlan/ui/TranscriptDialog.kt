@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -41,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -96,6 +98,16 @@ fun TranscriptContent(
   val ai = NerLanApp.instance.ai
   val settings = NerLanApp.instance.settings
   val episodeId = record.id
+
+  // Keep the screen awake while the transcript is on screen (caption mode in the
+  // player, the standalone dialog, or the large-screen panel) so it doesn't sleep
+  // mid-read. The flag is set on the host window's view and cleared automatically
+  // the moment this view leaves composition.
+  val view = LocalView.current
+  DisposableEffect(Unit) {
+    view.keepScreenOn = true
+    onDispose { view.keepScreenOn = false }
+  }
 
   val sentences = remember(text, cues) {
     if (!cues.isNullOrEmpty()) cues.map { it.text }

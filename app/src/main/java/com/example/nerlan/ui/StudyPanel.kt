@@ -91,7 +91,7 @@ fun StudyDetailPanel(
     is StudyItem.Transcript -> {
       val text = remember(item.record.id, revision) { ai.transcriptText(item.record.id).orEmpty() }
       val cues = remember(item.record.id, revision) { ai.transcriptCues(item.record.id) }
-      TranscriptContent(item.record.title, text, close, leading, episodeId = item.record.id, cues = cues)
+      TranscriptContent(item.record, text, close, leading, cues = cues)
     }
     is StudyItem.Handout -> {
       val html = remember(item.record.id, revision) { ai.handoutHtml(item.record.id).orEmpty() }

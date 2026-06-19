@@ -135,8 +135,8 @@ fun AiActionButton(
   if (showSheet) {
     when (kind) {
       AiKind.TRANSCRIPT -> TranscriptDialog(
-        record.title, ai.transcriptText(record.id).orEmpty(),
-        onDismiss = { showSheet = false }, episodeId = record.id, cues = ai.transcriptCues(record.id))
+        record, ai.transcriptText(record.id).orEmpty(),
+        onDismiss = { showSheet = false }, cues = ai.transcriptCues(record.id))
       AiKind.HANDOUT -> HandoutDialog(record.title, ai.handoutHtml(record.id).orEmpty()) { showSheet = false }
     }
   }

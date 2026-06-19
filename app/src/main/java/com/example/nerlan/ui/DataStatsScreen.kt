@@ -52,6 +52,7 @@ fun DataStatsScreen(onDismiss: () -> Unit) {
   val cachedCount = remember { AudioCache.cachedResourceCount(context) }
   val transcriptCount = remember { app.ai.transcriptCount() }
   val handoutCount = remember { app.ai.handoutCount() }
+  val translationCount = remember { app.ai.translationCount() }
 
   val languageRows = remember(downloads) {
     downloads.groupingBy { it.language }.eachCount().entries.sortedByDescending { it.value }
@@ -94,6 +95,7 @@ fun DataStatsScreen(onDismiss: () -> Unit) {
           Title("AI 內容")
           StatRow("逐字稿", "$transcriptCount")
           StatRow("AI 講義", "$handoutCount")
+          StatRow("翻譯", "$translationCount")
 
           if (languageRows.isNotEmpty()) {
             Title("語言分布（已下載）")

@@ -37,6 +37,9 @@ class AIContentStore(private val context: Context) {
   /** Sidecar timestamp cues for transcripts, keyed by episode id. Synced as
    *  write-once content files alongside the transcript (see DriveSync). */
   private val cuesDir = File(context.filesDir, "ai/cues").apply { mkdirs() }
+  /** Per-episode transcript translations (StoredTranslation JSON), synced as a
+   *  content file alongside the transcript. */
+  private val translationsDir = File(context.filesDir, "ai/translations").apply { mkdirs() }
   private val indexFile = File(context.filesDir, "ai/index.json")
   private val json = Json { ignoreUnknownKeys = true }
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -44,6 +47,12 @@ class AIContentStore(private val context: Context) {
   /** Keyed "transcript:{id}" / "handout:{id}"; absence means idle. */
   private val _jobs = MutableStateFlow<Map<String, JobState>>(emptyMap())
   val jobs: StateFlow<Map<String, JobState>> = _jobs
+
+  /** Translation jobs, keyed by episode id; absence means idle. Translation is
+   *  triggered from the transcript screen (not the shared AI action buttons), so
+   *  it gets its own job map. */
+  private val _translationJobs = MutableStateFlow<Map<String, JobState>>(emptyMap())
+  val translationJobs: StateFlow<Map<String, JobState>> = _translationJobs
 
   /** episode id -> record, for every episode that has a transcript or handout.
    *  Powers the AI tab and supplies metadata for sync; backfilled from
@@ -64,9 +73,17 @@ class AIContentStore(private val context: Context) {
   private fun transcriptFile(id: String) = File(transcriptsDir, "$id.txt")
   private fun handoutFile(id: String) = File(handoutsDir, "$id.html")
   private fun cueFile(id: String) = File(cuesDir, "$id.json")
+  private fun translationFile(id: String) = File(translationsDir, "$id.json")
 
   fun hasTranscript(id: String) = transcriptFile(id).exists()
   fun hasHandout(id: String) = handoutFile(id).exists()
+
+  /** The saved translation for an episode, if any. Carries its target language so
+   *  the transcript screen can tell whether it matches the current setting. */
+  fun translation(id: String): StoredTranslation? =
+    translationFile(id).takeIf { it.exists() }?.let {
+      runCatching { json.decodeFromString<StoredTranslation>(it.readText()) }.getOrNull()
+    }
 
   /** Timestamp cues for an episode's transcript, when present. Null for transcripts
    *  made before cues existed (or with a no-timestamp model), which the transcript
@@ -79,6 +96,7 @@ class AIContentStore(private val context: Context) {
   /** Counts of saved content, for the 資料統計 screen. */
   fun transcriptCount(): Int = transcriptsDir.listFiles()?.count { it.isFile } ?: 0
   fun handoutCount(): Int = handoutsDir.listFiles()?.count { it.isFile } ?: 0
+  fun translationCount(): Int = translationsDir.listFiles()?.count { it.isFile } ?: 0
   fun transcriptText(id: String): String? = transcriptFile(id).takeIf { it.exists() }?.readText()
   fun handoutHtml(id: String): String? = handoutFile(id).takeIf { it.exists() }?.readText()
 
@@ -145,20 +163,31 @@ class AIContentStore(private val context: Context) {
     scope.launch { runHandout(record) }
   }
 
+  /** Generate (or regenerate, if the language changed) the translation for an
+   *  episode's transcript. No-ops while a job is already running for it. */
+  fun translate(record: EpisodeRecord) {
+    if (_translationJobs.value[record.id] is JobState.Running) return
+    scope.launch { runTranslation(record) }
+  }
+
   fun clearAll() {
     transcriptsDir.listFiles()?.forEach { it.delete() }
     handoutsDir.listFiles()?.forEach { it.delete() }
     cuesDir.listFiles()?.forEach { it.delete() }
+    translationsDir.listFiles()?.forEach { it.delete() }
     _records.value = emptyMap()
     persist()
     _jobs.value = emptyMap()
+    _translationJobs.value = emptyMap()
     _revision.value += 1
   }
 
   /** Delete one episode's saved content of [kind]. */
   fun delete(kind: AiKind, id: String) {
     when (kind) {
-      AiKind.TRANSCRIPT -> { transcriptFile(id).delete(); cueFile(id).delete() }
+      // The cue + translation sidecars are derived from this transcript, so they
+      // go with it (a regenerated transcript may re-segment differently).
+      AiKind.TRANSCRIPT -> { transcriptFile(id).delete(); cueFile(id).delete(); translationFile(id).delete(); _translationJobs.update { it - id } }
       AiKind.HANDOUT -> handoutFile(id).delete()
     }
     clearJob(key(kind, id))
@@ -270,6 +299,31 @@ class AIContentStore(private val context: Context) {
       clearJob(k)
     } catch (e: Exception) {
       setJob(k, JobState.Failed(e.message ?: "處理失敗"))
+    }
+  }
+
+  /** Translate an episode's transcript into the current target language and save
+   *  it sentence-aligned. Overwrites any existing translation (e.g. when the target
+   *  language changed). Requires the transcript to already exist. */
+  private suspend fun runTranslation(record: EpisodeRecord) {
+    val id = record.id
+    val settings = NerLanApp.instance.settings
+    val language = settings.translationLanguage.value
+    val text = transcriptText(id) ?: run {
+      _translationJobs.update { it + (id to JobState.Failed("找不到逐字稿")) }
+      return
+    }
+    _translationJobs.update { it + (id to JobState.Running("翻譯中…")) }
+    try {
+      val sentences = displaySentences(text)
+      val translated = OpenAIService.translateSentences(
+        sentences, language, settings.chatModelOrDefault(), settings.apiKey.value)
+      translationFile(id).writeText(json.encodeToString(StoredTranslation(language, translated)))
+      noteRecord(record)
+      _translationJobs.update { it - id }
+      _revision.value += 1
+    } catch (e: Exception) {
+      _translationJobs.update { it + (id to JobState.Failed(e.message ?: "翻譯失敗")) }
     }
   }
 

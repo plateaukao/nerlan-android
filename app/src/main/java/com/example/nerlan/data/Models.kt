@@ -71,6 +71,14 @@ data class LanguageTags(
 @Serializable
 data class TranscriptCue(val start: Double, val text: String)
 
+/** A transcript translated into [language], one entry per display sentence
+ *  (aligned 1:1 with AIContentStore.displaySentences, the same indexing the cues
+ *  use). The [language] tag lets a device tell whether its cached translation
+ *  matches the current target; if not, it regenerates. Persisted as
+ *  filesDir/ai/translations/{id}.json and synced like the cue sidecars. */
+@Serializable
+data class StoredTranslation(val language: String, val sentences: List<String>)
+
 // MARK: Programs
 
 @Serializable

@@ -399,17 +399,20 @@ class DriveSync(private val context: Context) {
   private fun decodeMap(bytes: ByteArray?): Map<String, EpisodeRecord> =
     bytes?.let { runCatching { json.decodeFromString<Map<String, EpisodeRecord>>(String(it)) }.getOrNull() } ?: emptyMap()
 
-  /** drive name -> local content file, for transcripts, handouts, and cue sidecars. */
+  /** drive name -> local content file, for transcripts, handouts, cue sidecars,
+   *  and translation sidecars. */
   private fun contentFiles(): Map<String, File> = buildMap {
     File(filesDir, "ai/transcripts").listFiles()?.forEach { put("transcript-${it.nameWithoutExtension}.txt", it) }
     File(filesDir, "ai/handouts").listFiles()?.forEach { put("handout-${it.nameWithoutExtension}.html", it) }
     File(filesDir, "ai/cues").listFiles()?.forEach { put("cues-${it.nameWithoutExtension}.json", it) }
+    File(filesDir, "ai/translations").listFiles()?.forEach { put("translation-${it.nameWithoutExtension}.json", it) }
   }
 
   private fun isContentName(name: String) =
     (name.startsWith("transcript-") && name.endsWith(".txt")) ||
       (name.startsWith("handout-") && name.endsWith(".html")) ||
-      (name.startsWith("cues-") && name.endsWith(".json"))
+      (name.startsWith("cues-") && name.endsWith(".json")) ||
+      (name.startsWith("translation-") && name.endsWith(".json"))
 
   private fun writeContent(name: String, bytes: ByteArray) {
     when {
@@ -424,6 +427,10 @@ class DriveSync(private val context: Context) {
       name.startsWith("cues-") && name.endsWith(".json") -> {
         val id = name.removePrefix("cues-").removeSuffix(".json")
         File(filesDir, "ai/cues").apply { mkdirs() }.let { File(it, "$id.json").writeBytes(bytes) }
+      }
+      name.startsWith("translation-") && name.endsWith(".json") -> {
+        val id = name.removePrefix("translation-").removeSuffix(".json")
+        File(filesDir, "ai/translations").apply { mkdirs() }.let { File(it, "$id.json").writeBytes(bytes) }
       }
     }
   }

@@ -37,3 +37,20 @@
 -dontwarn org.conscrypt.**
 -dontwarn org.bouncycastle.**
 -dontwarn org.openjsse.**
+
+# --- media3 (AudioTranscoder / Transformer) ----------------------------------
+# The transcribe path crashes on API < 31 devices (e.g. Hisense A7 / Android 10)
+# with NoClassDefFoundError: android.media.metrics.LogSessionId — but only in
+# R8-minified release builds. media3 guards that API-31 reference behind an
+# SDK_INT >= 31 check, but R8 full-mode optimization (horizontal class merging /
+# code relocation) moves it into an eagerly-verified path, so ART aborts when the
+# class is absent below API 31. A keep rule on LogSessionId itself is useless (the
+# class doesn't exist on the device), and pinning individual media3 classes only
+# makes R8 relocate the reference elsewhere — we hit it first in the Transformer
+# asset-loader factory, then again deeper on the internal ExoPlayer:Playback
+# thread (PlayerId/renderer init). The reliable fix per androidx/media#2535 is to
+# stop R8 optimizing media3 at all, which preserves every SDK_INT guard. Costs a
+# little APK size (media3 stays un-optimized); revisit if/when the upstream R8 bug
+# is fixed. disableHorizontalClassMerging alone does NOT fix it.
+-keep class androidx.media3.** { *; }
+-dontwarn android.media.metrics.**

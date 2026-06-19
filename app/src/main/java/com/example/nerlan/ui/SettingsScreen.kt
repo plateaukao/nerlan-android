@@ -68,6 +68,7 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   val chatModel by settings.chatModel.collectAsState()
   val transcriptionModel by settings.transcriptionModel.collectAsState()
   val cacheStreamedAudio by settings.cacheStreamedAudio.collectAsState()
+  val translationLanguage by settings.translationLanguage.collectAsState()
   val syncToDrive by settings.syncToDrive.collectAsState()
   val driveEmail by drive.accountEmail.collectAsState()
   val driveStatus by drive.status.collectAsState()
@@ -101,6 +102,7 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   var showUsageStats by remember { mutableStateOf(false) }
   var showDataStats by remember { mutableStateOf(false) }
   var modelMenuExpanded by remember { mutableStateOf(false) }
+  var translationMenuExpanded by remember { mutableStateOf(false) }
   var cacheBytes by remember { mutableStateOf(AudioCache.sizeBytes(NerLanApp.instance)) }
 
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -181,6 +183,44 @@ fun SettingsScreen(onDismiss: () -> Unit) {
             settings.setTranscriptionModel(SettingsStore.DEFAULT_TRANSCRIPTION_MODEL)
             settings.setChatModel(SettingsStore.DEFAULT_CHAT_MODEL)
           }) { Text("恢復預設模型") }
+
+          Spacer(Modifier.height(16.dp))
+          Text("翻譯", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 4.dp))
+          ExposedDropdownMenuBox(
+            expanded = translationMenuExpanded,
+            onExpandedChange = { translationMenuExpanded = it },
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            OutlinedTextField(
+              value = translationLanguage,
+              onValueChange = {},
+              readOnly = true,
+              singleLine = true,
+              label = { Text("翻譯語言") },
+              trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = translationMenuExpanded) },
+              modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+            )
+            ExposedDropdownMenu(
+              expanded = translationMenuExpanded,
+              onDismissRequest = { translationMenuExpanded = false },
+            ) {
+              SettingsStore.TRANSLATION_LANGUAGES.forEach { lang ->
+                DropdownMenuItem(
+                  text = { Text(lang) },
+                  onClick = {
+                    settings.setTranslationLanguage(lang)
+                    translationMenuExpanded = false
+                  },
+                )
+              }
+            }
+          }
+          Text(
+            "逐字稿畫面的「翻譯」按鈕會把內容翻譯成這個語言（使用你的 OpenAI 額度，並會同步）。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+          )
 
           Spacer(Modifier.height(16.dp))
           Text("串流快取", style = MaterialTheme.typography.titleSmall,

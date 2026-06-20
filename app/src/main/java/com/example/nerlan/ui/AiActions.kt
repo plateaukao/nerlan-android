@@ -9,9 +9,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.outlined.AutoAwesome as AutoAwesomeOutline
+import androidx.compose.material.icons.outlined.Subtitles as SubtitlesOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -165,9 +166,11 @@ private fun AiIcon(kind: AiKind, running: Boolean, ready: Boolean, failed: Boole
       modifier = Modifier.size(20.dp),
     )
     else -> {
+      // Outline = not yet generated, filled = generated. The fill (not just the
+      // tint) carries the state so it stays legible on grayscale e-ink displays.
       val icon: ImageVector = when (kind) {
-        AiKind.TRANSCRIPT -> Icons.Filled.Subtitles
-        AiKind.HANDOUT -> if (ready) Icons.Filled.Description else Icons.Filled.AutoAwesome
+        AiKind.TRANSCRIPT -> if (ready) Icons.Filled.Subtitles else Icons.Outlined.SubtitlesOutline
+        AiKind.HANDOUT -> if (ready) Icons.Filled.AutoAwesome else Icons.Outlined.AutoAwesomeOutline
       }
       Icon(
         icon,

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.outlined.Info as InfoOutline
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -258,6 +259,11 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         }
 
         if (record.pdfAttachments.isNotEmpty()) {
+          // Filled once the PDF is saved offline, outline until then (fill, not
+          // tint, signals state on e-ink). Matches the AI transcript/handout icons.
+          val handoutSaved = remember(downloadRecords, record.id) {
+            record.pdfAttachments.all { downloads.localAttachmentPath(it) != null }
+          }
           TextButton(
             onClick = {
               if (panel != null) { panel.item = StudyItem.Attachment(record); onDismiss() }
@@ -265,7 +271,11 @@ fun PlayerSheet(onDismiss: () -> Unit) {
             },
             contentPadding = controlPadding,
           ) {
-            Icon(Icons.Filled.Info, contentDescription = null, modifier = Modifier.size(20.dp))
+            Icon(
+              if (handoutSaved) Icons.Filled.Info else Icons.Outlined.InfoOutline,
+              contentDescription = null,
+              modifier = Modifier.size(20.dp),
+            )
             Text("講義", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
           }
         }

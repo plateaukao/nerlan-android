@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.outlined.Info as InfoOutline
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -161,11 +162,8 @@ fun RecordRow(
     if (showFavorite) RowFavoriteButton(record)
     if (showDownload) RowDownloadButton(record)
     if (record.pdfAttachments.isNotEmpty()) {
-      IconButton(onClick = {
+      RowHandoutButton(record) {
         if (panel != null) panel.item = StudyItem.Attachment(record) else showAttachment = true
-      }) {
-        Icon(Icons.Filled.Info, contentDescription = "講義",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
       }
     }
     if (showAI) {
@@ -215,6 +213,26 @@ fun RecordRow(
       title = record.title,
       attachments = record.pdfAttachments,
       onDismiss = { showAttachment = false },
+    )
+  }
+}
+
+/** Inline PDF-handout (講義) button. Filled once the PDF is saved offline,
+ *  outline until then — the fill, not the tint, signals it on e-ink. Collects
+ *  download state only here so rows without an attachment stay free of it. */
+@Composable
+private fun RowHandoutButton(record: EpisodeRecord, onOpen: () -> Unit) {
+  val downloads = NerLanApp.instance.downloads
+  val downloadRecords by downloads.records.collectAsState()
+  val saved = remember(downloadRecords, record.id) {
+    record.pdfAttachments.all { downloads.localAttachmentPath(it) != null }
+  }
+  IconButton(onClick = onOpen) {
+    Icon(
+      if (saved) Icons.Filled.Info else Icons.Outlined.InfoOutline,
+      contentDescription = "講義",
+      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      modifier = Modifier.size(20.dp),
     )
   }
 }

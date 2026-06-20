@@ -54,7 +54,29 @@ import com.example.nerlan.data.EpisodeRecord
 import com.example.nerlan.data.SettingsStore
 import com.example.nerlan.data.TranscriptCue
 import com.example.nerlan.player.PlayerManager
+import com.example.nerlan.player.ShadowRecorder
 import kotlinx.coroutines.flow.collectLatest
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.flow.drop
 
 /**
  * Read-only transcript viewer shown as a full-screen dialog over the player. The
@@ -77,10 +99,11 @@ fun TranscriptDialog(
   text: String,
   onDismiss: () -> Unit,
   cues: List<TranscriptCue>? = null,
+  startShadowing: Boolean = false,
 ) {
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
     Surface(Modifier.fillMaxSize()) {
-      TranscriptContent(record, text, onDismiss, cues = cues)
+      TranscriptContent(record, text, onDismiss, cues = cues, startShadowing = startShadowing)
     }
   }
 }
@@ -93,6 +116,7 @@ fun TranscriptContent(
   onClose: () -> Unit,
   leading: @Composable () -> Unit = {},
   cues: List<TranscriptCue>? = null,
+  startShadowing: Boolean = false,
 ) {
   val ai = NerLanApp.instance.ai
   val settings = NerLanApp.instance.settings
@@ -172,6 +196,90 @@ fun TranscriptContent(
     }
   }
 
+  // --- Shadowing state ------------------------------------------------------
+  val isCurrentEpisode = current?.id == episodeId
+  val shadowingAvailable = isCurrentEpisode && !cues.isNullOrEmpty()
+  var shadowing by remember(episodeId) { mutableStateOf(false) }
+  var shadowIndex by remember(episodeId) { mutableStateOf<Int?>(null) }
+  val loopCount by settings.shadowLoopCount.collectAsState()
+  val recording by ShadowRecorder.isRecording.collectAsState()
+  val playingMine by ShadowRecorder.isPlaying.collectAsState()
+  val loopRegion by PlayerManager.loopRegion.collectAsState()
+  // Highlight the loop target while shadowing (stable across the loop's lead-in),
+  // else the sentence being spoken.
+  val highlightIndex = if (shadowing) (shadowIndex ?: -1) else activeIndex
+
+  val context = LocalContext.current
+  var micGranted by remember {
+    mutableStateOf(
+      ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+        PackageManager.PERMISSION_GRANTED
+    )
+  }
+  var pendingRecordKey by remember { mutableStateOf<String?>(null) }
+  var showMicDenied by remember { mutableStateOf(false) }
+  val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    micGranted = granted
+    if (granted) pendingRecordKey?.let { ShadowRecorder.startRecording(it) } else showMicDenied = true
+    pendingRecordKey = null
+  }
+
+  fun recordKey(i: Int) = "$episodeId-$i"
+  // A sentence's span: its cue start to the next cue's start (duration for the last).
+  fun regionFor(i: Int): Pair<Long, Long>? {
+    val c = cues ?: return null
+    if (i < 0 || i >= c.size) return null
+    val startMs = (c[i].start * 1000).toLong()
+    val endMs = if (i + 1 < c.size) (c[i + 1].start * 1000).toLong() else PlayerManager.durationMs.value
+    return startMs to endMs
+  }
+  // Stops any in-progress recording / playback first, so stepping to another
+  // sentence (or replaying) interrupts a take and plays the segment.
+  fun loopSentence(i: Int?) {
+    val idx = i ?: return
+    val r = regionFor(idx) ?: return
+    ShadowRecorder.reset()
+    shadowIndex = idx
+    PlayerManager.loopSegment(r.first, r.second, if (loopCount == 0) null else loopCount)
+  }
+  fun requestRecord(key: String) {
+    if (micGranted) ShadowRecorder.startRecording(key)
+    else { pendingRecordKey = key; micLauncher.launch(Manifest.permission.RECORD_AUDIO) }
+  }
+  fun setShadowing(on: Boolean) {
+    shadowing = on
+    if (on) loopSentence(if (activeIndex >= 0) activeIndex else 0)
+    else { shadowIndex = null; PlayerManager.clearLoop(); ShadowRecorder.reset() }
+  }
+
+  // Stop the loop / recorder when this transcript leaves composition while shadowing.
+  val shadowingFlag by rememberUpdatedState(shadowing)
+  DisposableEffect(Unit) {
+    onDispose { if (shadowingFlag) { PlayerManager.clearLoop(); ShadowRecorder.reset() } }
+  }
+
+  // Auto-start shadowing when opened via the 跟讀 entry.
+  var didAutoStart by remember(episodeId) { mutableStateOf(false) }
+  LaunchedEffect(startShadowing, shadowingAvailable) {
+    if (startShadowing && shadowingAvailable && !shadowing && !didAutoStart) {
+      didAutoStart = true
+      setShadowing(true)
+    }
+  }
+
+  // After a finite loop finishes its repeats, auto-start recording the learner's
+  // turn. drop(1) skips the value StateFlow emits on subscription, so only a real
+  // completion (not entering the view) triggers it. Infinite loops never finish.
+  val currentShadowIndex by rememberUpdatedState(shadowIndex)
+  LaunchedEffect(shadowing) {
+    if (!shadowing) return@LaunchedEffect
+    PlayerManager.loopFinishedSignal.drop(1).collect {
+      if (shadowingAvailable && !ShadowRecorder.isRecording.value && !ShadowRecorder.isPlaying.value) {
+        currentShadowIndex?.let { requestRecord(recordKey(it)) }
+      }
+    }
+  }
+
   // Keep the spoken sentence centered in the viewport (LazyColumn has no center
   // anchor, so centering means a scroll offset of half the leftover space; cf.
   // iOS `scrollTo(anchor: .center)`). Two modes, chosen by scrollAnimated:
@@ -184,7 +292,7 @@ fun TranscriptContent(
   //  • Off (e-ink) — an instant jump that centers each sentence once, when it
   //    becomes active. e-ink disables animations system-wide anyway, and a
   //    continuous scroll would smear/ghost.
-  if (scrollAnimated) {
+  if (scrollAnimated && !shadowing) {
     LaunchedEffect(cues, episodeId) {
       val c = cues
       if (c.isNullOrEmpty()) return@LaunchedEffect
@@ -226,20 +334,23 @@ fun TranscriptContent(
       }
     }
   } else {
-    LaunchedEffect(activeIndex) {
-      if (activeIndex < 0) return@LaunchedEffect
+    // e-ink instant centering, and (in any scroll mode) centering on the looped
+    // sentence while shadowing.
+    val scrollTarget = if (shadowing) (shadowIndex ?: -1) else activeIndex
+    LaunchedEffect(scrollTarget) {
+      if (scrollTarget < 0) return@LaunchedEffect
       fun centerOffset(): Int? {
         val info = listState.layoutInfo
-        val item = info.visibleItemsInfo.firstOrNull { it.index == activeIndex } ?: return null
+        val item = info.visibleItemsInfo.firstOrNull { it.index == scrollTarget } ?: return null
         val viewport = info.viewportEndOffset - info.viewportStartOffset
         return -(viewport - item.size) / 2
       }
       val off = centerOffset()
       if (off != null) {
-        listState.scrollToItem(activeIndex, off)
+        listState.scrollToItem(scrollTarget, off)
       } else {
-        listState.scrollToItem(activeIndex)
-        centerOffset()?.let { listState.scrollToItem(activeIndex, it) }
+        listState.scrollToItem(scrollTarget)
+        centerOffset()?.let { listState.scrollToItem(scrollTarget, it) }
       }
     }
   }
@@ -262,6 +373,16 @@ fun TranscriptContent(
       leading()
       IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "關閉") }
       Spacer(Modifier.weight(1f))
+      if (shadowingAvailable) {
+        IconButton(onClick = { setShadowing(!shadowing) }) {
+          Icon(
+            Icons.Filled.RecordVoiceOver,
+            contentDescription = "跟讀",
+            tint = if (shadowing) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+      }
       if (sentences.isNotEmpty()) {
         IconButton(onClick = { settings.setTranscriptFontScale((fontScale + 1) % SettingsStore.TRANSCRIPT_FONT_SIZES.size) }) {
           Icon(
@@ -290,14 +411,14 @@ fun TranscriptContent(
     }
 
     if (sentences.isEmpty()) {
-      Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+      Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
         Text("沒有逐字稿內容", color = MaterialTheme.colorScheme.onSurfaceVariant)
       }
     } else {
-      SelectionContainer {
+      SelectionContainer(Modifier.fillMaxWidth().weight(1f)) {
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
           items(sentences.size) { i ->
-            val active = i == activeIndex
+            val active = i == highlightIndex
             val translated = translation?.getOrNull(i)
             // In translation-only mode, fall back to the original when a line has
             // no translation, so the row is never blank.
@@ -305,6 +426,7 @@ fun TranscriptContent(
             Column(
               modifier = Modifier
                 .fillMaxWidth()
+                .then(if (shadowing) Modifier.clickable { loopSentence(i) } else Modifier)
                 .background(
                   if (active) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else Color.Transparent
                 )
@@ -336,6 +458,91 @@ fun TranscriptContent(
         }
       }
     }
+
+    // Sentence-grained transport + recording, shown while shadowing.
+    if (shadowing && shadowingAvailable) {
+      val count = cues?.size ?: 0
+      var countMenuOpen by remember { mutableStateOf(false) }
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+      ) {
+        IconButton(
+          onClick = { loopSentence((shadowIndex ?: 0) - 1) },
+          enabled = (shadowIndex ?: 0) > 0,
+        ) { Icon(Icons.Filled.SkipPrevious, contentDescription = "上一句") }
+
+        IconButton(onClick = {
+          if (loopRegion != null) { PlayerManager.clearLoop(); PlayerManager.pause() }
+          else loopSentence(shadowIndex ?: if (activeIndex >= 0) activeIndex else 0)
+        }) {
+          Icon(
+            if (loopRegion != null) Icons.Filled.Pause else Icons.Filled.Replay,
+            contentDescription = if (loopRegion != null) "停止重複" else "重複這句",
+          )
+        }
+
+        IconButton(
+          onClick = { loopSentence((shadowIndex ?: -1) + 1) },
+          enabled = shadowIndex != null && (shadowIndex!! + 1) < count,
+        ) { Icon(Icons.Filled.SkipNext, contentDescription = "下一句") }
+
+        Spacer(Modifier.weight(1f))
+
+        // Record your read, then play it back to compare with the original.
+        IconButton(onClick = {
+          if (recording) ShadowRecorder.stopRecording(thenPlay = true)
+          else shadowIndex?.let { requestRecord(recordKey(it)) }
+        }) {
+          Icon(
+            if (recording) Icons.Filled.Stop else Icons.Filled.Mic,
+            contentDescription = if (recording) "停止錄音" else "錄音",
+            tint = if (recording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+          )
+        }
+
+        val mineKey = shadowIndex?.let { recordKey(it) }
+        // `recording` flips when a take finishes, recomposing this and re-checking.
+        val canPlayMine = mineKey != null && ShadowRecorder.hasRecording(mineKey)
+        IconButton(
+          onClick = {
+            if (playingMine) ShadowRecorder.stopPlayback()
+            else mineKey?.let { ShadowRecorder.playRecording(it) }
+          },
+          enabled = playingMine || canPlayMine,
+        ) {
+          Icon(
+            if (playingMine) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+            contentDescription = "播放我的錄音",
+          )
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        Box {
+          TextButton(onClick = { countMenuOpen = true }) {
+            Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(
+              if (loopCount == 0) "∞" else "×$loopCount",
+              modifier = Modifier.padding(start = 4.dp),
+            )
+          }
+          DropdownMenu(expanded = countMenuOpen, onDismissRequest = { countMenuOpen = false }) {
+            listOf(1, 2, 3, 5, 0).forEach { n ->
+              DropdownMenuItem(
+                text = { Text((if (n == 0) "無限" else "$n 次") + if (n == loopCount) " ✓" else "") },
+                onClick = {
+                  settings.setShadowLoopCount(n)
+                  countMenuOpen = false
+                  if (shadowing) loopSentence(shadowIndex)
+                },
+              )
+            }
+          }
+        }
+      }
+    }
   }
 
   errorMessage?.let { msg ->
@@ -344,6 +551,15 @@ fun TranscriptContent(
       title = { Text("翻譯失敗") },
       text = { Text(msg) },
       confirmButton = { TextButton(onClick = { errorMessage = null }) { Text("好") } },
+    )
+  }
+
+  if (showMicDenied) {
+    AlertDialog(
+      onDismissRequest = { showMicDenied = false },
+      title = { Text("無法使用麥克風") },
+      text = { Text("請到系統設定開啟 NerLan 的麥克風權限，才能錄下你的朗讀。") },
+      confirmButton = { TextButton(onClick = { showMicDenied = false }) { Text("好") } },
     )
   }
 }

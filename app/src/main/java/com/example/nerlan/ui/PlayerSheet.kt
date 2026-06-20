@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.outlined.Info as InfoOutline
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
@@ -86,6 +87,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   var scrubPosition by remember { mutableFloatStateOf(0f) }
   var speedMenuOpen by remember { mutableStateOf(false) }
   var showAttachment by remember { mutableStateOf(false) }
+  var showShadowDialog by remember { mutableStateOf(false) }
 
   // Timestamp cues for the playing episode's transcript, when one exists. A
   // non-empty list enables the caption (字幕) toggle, which swaps the cover/title
@@ -340,6 +342,27 @@ fun PlayerSheet(onDismiss: () -> Unit) {
               )
               Text("字幕", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
             }
+
+            // 跟讀: open the transcript (dialog on phone, side panel on large
+            // screens) already in shadowing mode — same surface as 逐字稿.
+            Row(
+              modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable {
+                  if (panel != null) { panel.item = StudyItem.Shadow(record); onDismiss() }
+                  else showShadowDialog = true
+                }
+                .padding(horizontal = 6.dp, vertical = 8.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Icon(
+                Icons.Filled.RecordVoiceOver,
+                contentDescription = "跟讀",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp),
+              )
+              Text("跟讀", style = controlLabel, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+            }
           }
           AiActionButton(AiKind.TRANSCRIPT, record, compact = false, onOpenedInPanel = onDismiss)
           AiActionButton(AiKind.HANDOUT, record, compact = false, onOpenedInPanel = onDismiss)
@@ -351,6 +374,16 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           title = record.title,
           attachments = record.pdfAttachments,
           onDismiss = { showAttachment = false },
+        )
+      }
+
+      if (showShadowDialog) {
+        TranscriptDialog(
+          record,
+          ai.transcriptText(record.id).orEmpty(),
+          onDismiss = { showShadowDialog = false },
+          cues = captionCues,
+          startShadowing = true,
         )
       }
     }

@@ -32,6 +32,7 @@ sealed interface StudyItem {
   val record: EpisodeRecord
 
   data class Transcript(override val record: EpisodeRecord) : StudyItem
+  data class Shadow(override val record: EpisodeRecord) : StudyItem  // transcript opened straight into shadowing
   data class Handout(override val record: EpisodeRecord) : StudyItem
   data class Attachment(override val record: EpisodeRecord) : StudyItem
 }
@@ -92,6 +93,11 @@ fun StudyDetailPanel(
       val text = remember(item.record.id, revision) { ai.transcriptText(item.record.id).orEmpty() }
       val cues = remember(item.record.id, revision) { ai.transcriptCues(item.record.id) }
       TranscriptContent(item.record, text, close, leading, cues = cues)
+    }
+    is StudyItem.Shadow -> {
+      val text = remember(item.record.id, revision) { ai.transcriptText(item.record.id).orEmpty() }
+      val cues = remember(item.record.id, revision) { ai.transcriptCues(item.record.id) }
+      TranscriptContent(item.record, text, close, leading, cues = cues, startShadowing = true)
     }
     is StudyItem.Handout -> {
       val html = remember(item.record.id, revision) { ai.handoutHtml(item.record.id).orEmpty() }

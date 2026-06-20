@@ -14,6 +14,7 @@ import com.example.nerlan.data.EpisodeRecord
 import com.google.common.util.concurrent.MoreExecutors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +57,18 @@ object PlayerManager {
 
   private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
   val repeatMode: StateFlow<Int> = _repeatMode
+
+  /** The [startMs, endMs) region currently looping for shadowing, or null. */
+  private val _loopRegion = MutableStateFlow<LongRange?>(null)
+  val loopRegion: StateFlow<LongRange?> = _loopRegion
+
+  /** Bumped when a finite sentence loop finishes its last pass — the shadowing UI
+   *  observes this to auto-start recording the learner's repeat. */
+  private val _loopFinishedSignal = MutableStateFlow(0)
+  val loopFinishedSignal: StateFlow<Int> = _loopFinishedSignal
+
+  private var loopRemaining: Int? = null
+  private var loopJob: Job? = null
 
   fun initialize(context: Context) {
     if (controller != null) return
@@ -159,6 +172,7 @@ object PlayerManager {
 
   fun play(record: EpisodeRecord, queue: List<EpisodeRecord>) {
     val c = controller ?: return
+    clearLoop()   // a sentence loop never carries across episodes
     val playable = queue.filter { it.audio != null }
     val index = playable.indexOfFirst { it.id == record.id }.coerceAtLeast(0)
     c.setMediaItems(playable.map(::mediaItemOf), index, 0)
@@ -172,9 +186,68 @@ object PlayerManager {
     if (c.isPlaying) c.pause() else c.play()
   }
 
-  fun next() { controller?.seekToNextMediaItem() }
+  fun next() { clearLoop(); controller?.seekToNextMediaItem() }
 
-  fun previous() { controller?.seekToPreviousMediaItem() }
+  fun previous() { clearLoop(); controller?.seekToPreviousMediaItem() }
+
+  /** Pause without touching the queue or loop — used when the recorder takes the
+   *  mic, when playing back the learner's own voice, and at a finite loop's end. */
+  fun pause() { controller?.pause() }
+
+  // --- Shadowing: single-sentence loop -------------------------------------
+
+  /**
+   * Loop a single [startMs, endMs) region — the core of shadowing's sentence
+   * repeat. [times] null loops forever; a finite count plays the segment that many
+   * times, then stops on the sentence and bumps [loopFinishedSignal] so the UI can
+   * auto-start recording. Replaces any region already looping. Media3 exposes no
+   * exact boundary callback through MediaController, so a tight poll (~40ms, far
+   * finer than the 500ms position loop) watches the end and seeks back.
+   */
+  fun loopSegment(startMs: Long, endMs: Long, times: Int?) {
+    val c = controller ?: return
+    val from = startMs.coerceAtLeast(0)
+    if (endMs <= from) return
+    loopJob?.cancel()
+    loopRemaining = times
+    _loopRegion.value = from..endMs
+    c.seekTo(from)
+    c.play()
+    loopJob = scope.launch {
+      var triggered = false
+      while (true) {
+        val ctrl = controller ?: break
+        val pos = ctrl.currentPosition
+        if (!triggered && pos >= endMs) {
+          triggered = true
+          val rem = loopRemaining
+          when {
+            rem == null -> ctrl.seekTo(from)
+            rem > 1 -> { loopRemaining = rem - 1; ctrl.seekTo(from) }
+            else -> {
+              // Finite count done: stop on the sentence and signal the UI.
+              ctrl.pause()
+              _loopRegion.value = null
+              loopRemaining = null
+              _loopFinishedSignal.value += 1
+              break
+            }
+          }
+        } else if (triggered && pos < endMs) {
+          triggered = false   // the seek landed; re-arm for the next pass
+        }
+        delay(40)
+      }
+    }
+  }
+
+  /** Stop any active segment loop; playback continues from wherever it is. */
+  fun clearLoop() {
+    loopJob?.cancel()
+    loopJob = null
+    _loopRegion.value = null
+    loopRemaining = null
+  }
 
   fun seekTo(ms: Long) { controller?.seekTo(ms) }
 

@@ -1,5 +1,6 @@
 package com.example.nerlan.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,9 +20,12 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -99,7 +103,11 @@ fun SectionHeader(title: String) {
  * Shared row for favorites / downloads / AI lists: tap to play, optional trash.
  * In [aiReadyOnly] mode (the AI tab) the transcript/handout buttons appear only
  * for content that already exists, regardless of whether an API key is set.
+ *
+ * When [onDelete] is set the row is wrapped in a [SwipeToDismissBox]: swipe it
+ * right-to-left to remove (downloads delete the file, favorites un-favorite).
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordRow(
   record: EpisodeRecord,
@@ -123,10 +131,13 @@ fun RecordRow(
   val isCurrent = current?.id == record.id
   var showAttachment by remember { mutableStateOf(false) }
 
-  Row(
+  val row = @Composable {
+   Row(
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier
       .fillMaxWidth()
+      // Opaque so the swipe-to-dismiss reveal doesn't bleed through the row.
+      .background(MaterialTheme.colorScheme.background)
       .clickable {
         if (isCurrent) PlayerManager.togglePlayPause() else PlayerManager.play(record, queue)
       }
@@ -168,12 +179,35 @@ fun RecordRow(
         AiActionButton(AiKind.HANDOUT, record, compact = true)
       }
     }
-    if (onDelete != null) {
-      IconButton(onClick = onDelete) {
-        Icon(Icons.Filled.Delete, contentDescription = "移除",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
-      }
+   }
+  }
+
+  if (onDelete != null) {
+    val dismissState = rememberSwipeToDismissBoxState()
+    SwipeToDismissBox(
+      state = dismissState,
+      onDismiss = { onDelete() },
+      enableDismissFromStartToEnd = false,
+      backgroundContent = {
+        Box(
+          Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 20.dp),
+          contentAlignment = Alignment.CenterEnd,
+        ) {
+          Icon(
+            Icons.Filled.Delete,
+            contentDescription = "移除",
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+          )
+        }
+      },
+    ) {
+      row()
     }
+  } else {
+    row()
   }
 
   if (showAttachment) {

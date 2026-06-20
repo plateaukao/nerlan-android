@@ -26,6 +26,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import net.openid.appauth.AuthState
 import net.openid.appauth.AuthorizationException
+import net.openid.appauth.AuthorizationManagementActivity
 import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
 import net.openid.appauth.AuthorizationService
@@ -153,8 +154,14 @@ class BrowserTokenProvider(private val context: Context) : TokenProvider {
     prefs.edit().remove(KEY_STATE).remove(KEY_EMAIL).apply()
   }
 
-  /** Step 1 of interactive auth: the Intent that opens the authorize URL (Custom
-   *  Tab or default browser). Settings launches it via `StartActivityForResult`. */
+  /** Step 1 of interactive auth: the Intent that opens the authorize URL. Settings
+   *  launches it via `StartActivityForResult`.
+   *
+   *  Rather than let AppAuth pick one browser for us (`getAuthorizationRequestIntent`
+   *  targets the default browser / a Custom Tab), we wrap a package-less ACTION_VIEW
+   *  in `Intent.createChooser` so the user explicitly picks which browser handles the
+   *  Google sign-in. We still hand it to AppAuth's `createStartForResultIntent` — the
+   *  same for-result entry point — so the redirect/response handling is unchanged. */
   fun authRequestIntent(): Intent {
     check(isConfigured) { "尚未設定瀏覽器 OAuth 用戶端（build.gradle DRIVE_OAUTH_CLIENT_ID）" }
     val request = AuthorizationRequest.Builder(
@@ -170,7 +177,11 @@ class BrowserTokenProvider(private val context: Context) : TokenProvider {
       .setPromptValues(AuthorizationRequest.Prompt.CONSENT)
       .setAdditionalParameters(mapOf("access_type" to "offline"))
       .build()
-    return authService.getAuthorizationRequestIntent(request)
+    val chooser = Intent.createChooser(
+      Intent(Intent.ACTION_VIEW, request.toUri()),
+      "選擇瀏覽器登入 Google 帳戶",
+    )
+    return AuthorizationManagementActivity.createStartForResultIntent(context, request, chooser)
   }
 
   /** Step 2: handle the custom-scheme redirect, exchange code+verifier for tokens,

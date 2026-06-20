@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -60,7 +59,7 @@ import kotlinx.coroutines.flow.collectLatest
 /**
  * Read-only transcript viewer shown as a full-screen dialog over the player. The
  * stored transcript has one sentence per line (segmented by the chat model),
- * rendered here as a numbered, sentence-by-sentence list in a LazyColumn.
+ * rendered here as a sentence-by-sentence list in a LazyColumn.
  *
  * Two top-bar controls tune the reading: a font-size button loops three sizes
  * (remembered across transcript screens in SettingsStore), and a translate button
@@ -303,7 +302,7 @@ fun TranscriptContent(
             // In translation-only mode, fall back to the original when a line has
             // no translation, so the row is never blank.
             val showOriginal = translateMode != 2 || translated.isNullOrEmpty()
-            Row(
+            Column(
               modifier = Modifier
                 .fillMaxWidth()
                 .background(
@@ -311,34 +310,26 @@ fun TranscriptContent(
                 )
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
-              Text(
-                "${i + 1}",
-                fontSize = (bodySize * 0.7).sp,
-                color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.width(28.dp),
-              )
-              Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                if (showOriginal) {
-                  Text(
-                    sentences[i],
-                    fontSize = bodySize.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else null,
-                    color = if (active) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                  )
-                }
-                if (translateMode != 0 && !translated.isNullOrEmpty()) {
-                  Text(
-                    translated,
-                    fontSize = (if (translateMode == 2) bodySize else bodySize - 2).sp,
-                    fontWeight = if (active && translateMode == 2) FontWeight.SemiBold else null,
-                    color = if (translateMode == 2) {
-                      if (active) MaterialTheme.colorScheme.primary else Color.Unspecified
-                    } else {
-                      MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    modifier = Modifier.padding(top = if (showOriginal) 2.dp else 0.dp),
-                  )
-                }
+              if (showOriginal) {
+                Text(
+                  sentences[i],
+                  fontSize = bodySize.sp,
+                  fontWeight = if (active) FontWeight.SemiBold else null,
+                  color = if (active) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                )
+              }
+              if (translateMode != 0 && !translated.isNullOrEmpty()) {
+                Text(
+                  translated,
+                  fontSize = (if (translateMode == 2) bodySize else bodySize - 2).sp,
+                  fontWeight = if (active && translateMode == 2) FontWeight.SemiBold else null,
+                  color = if (translateMode == 2) {
+                    if (active) MaterialTheme.colorScheme.primary else Color.Unspecified
+                  } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                  },
+                  modifier = Modifier.padding(top = if (showOriginal) 2.dp else 0.dp),
+                )
               }
             }
           }

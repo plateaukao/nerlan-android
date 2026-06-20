@@ -88,7 +88,9 @@ import kotlinx.coroutines.flow.drop
  * loops the view through three modes — original, original plus per-sentence
  * translation, and translation only — translating into the target language set in
  * Settings. The translation is generated on demand, cached, and synced by
- * AIContentStore. Translate-mode resets to original each time a transcript opens.
+ * AIContentStore. Translate-mode is remembered across screens; on open it's
+ * reapplied only when a matching translation is already cached, so opening one
+ * never silently starts a paid translation.
  *
  * When the transcript was produced with timestamps ([cues]) and belongs to the
  * episode currently playing, the spoken sentence is highlighted and kept on screen.
@@ -147,18 +149,22 @@ fun TranscriptContent(
 
   val bodySize = SettingsStore.TRANSCRIPT_FONT_SIZES[fontScale.coerceIn(0, SettingsStore.TRANSCRIPT_FONT_SIZES.size - 1)]
 
-  // View mode: 0 = original, 1 = original + translation, 2 = translation only.
-  // Resets to original each time this transcript opens.
-  var translateMode by remember(episodeId) { mutableStateOf(0) }
-  var pendingMode by remember(episodeId) { mutableStateOf<Int?>(null) }
-  var errorMessage by remember { mutableStateOf<String?>(null) }
-
   val translationJob = translationJobs[episodeId]
   val translating = translationJob is AIContentStore.JobState.Running
   // Cached translation for the current target language (null if absent / stale).
   val translation = remember(episodeId, revision, translationLanguage) {
     ai.translation(episodeId)?.takeIf { it.language == translationLanguage }?.sentences
   }
+
+  // View mode: 0 = original, 1 = original + translation, 2 = translation only.
+  // On open, honor the remembered preference only when a matching translation is
+  // already cached; otherwise show the original and never auto-trigger generation.
+  val translatePref by settings.transcriptTranslateMode.collectAsState()
+  var translateMode by remember(episodeId) {
+    mutableStateOf(if (translatePref != 0 && translation != null) translatePref else 0)
+  }
+  var pendingMode by remember(episodeId) { mutableStateOf<Int?>(null) }
+  var errorMessage by remember { mutableStateOf<String?>(null) }
 
   // Apply a pending mode switch once its translation finishes, or surface failure.
   LaunchedEffect(translationJob, translation) {
@@ -168,7 +174,7 @@ fun TranscriptContent(
         errorMessage = translationJob.message; pendingMode = null
       }
       translationJob == null && translation != null -> {
-        translateMode = pm; pendingMode = null
+        translateMode = pm; settings.setTranscriptTranslateMode(pm); pendingMode = null
       }
     }
   }
@@ -358,8 +364,8 @@ fun TranscriptContent(
   fun cycleTranslate() {
     val next = (translateMode + 1) % 3
     when {
-      next == 0 -> translateMode = 0
-      translation != null -> translateMode = next
+      next == 0 -> { translateMode = 0; settings.setTranscriptTranslateMode(0) }
+      translation != null -> { translateMode = next; settings.setTranscriptTranslateMode(next) }
       settings.apiKey.value.isBlank() -> errorMessage = "尚未設定 OpenAI API 金鑰，無法翻譯。"
       else -> { pendingMode = next; ai.translate(record) }
     }

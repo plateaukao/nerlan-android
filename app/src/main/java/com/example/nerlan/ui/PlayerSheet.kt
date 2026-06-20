@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -102,7 +103,16 @@ fun PlayerSheet(onDismiss: () -> Unit) {
     val record = current ?: return@ModalBottomSheet
     // In caption mode the transcript takes the slack above the controls, so the
     // column must fill the sheet height for weight(1f) to resolve.
-    val showCaptions = captionMode && captionsAvailable
+    // In landscape on a phone the sheet is too short for the 200dp cover plus the
+    // title/metadata header and all the controls, so the lower rows get cropped.
+    // Drop the whole header when the available height is small (phone landscape)
+    // so the transport and action rows always fit without scrolling. Portrait and
+    // tablets (taller than this) keep the cover as before.
+    val compactHeight = LocalConfiguration.current.screenHeightDp < 500
+    // Caption mode swaps the cover area for the synced transcript; with the header
+    // hidden in compact height there's nowhere for it to live, so disable it (and
+    // hide its toggle below) in phone landscape.
+    val showCaptions = captionMode && captionsAvailable && !compactHeight
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
       modifier = Modifier
@@ -121,7 +131,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
             cues = captionCues,
           )
         }
-      } else {
+      } else if (!compactHeight) {
         CoverImage(record.coverUrl, 200.dp)
         Text(
           record.title,
@@ -311,8 +321,9 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
         ) {
           // Caption toggle: only when the transcript carries timestamps, so the
-          // synced transcript view has cues to highlight/scroll.
-          if (captionsAvailable) {
+          // synced transcript view has cues to highlight/scroll. Hidden in compact
+          // height (phone landscape) where caption mode is disabled.
+          if (captionsAvailable && !compactHeight) {
             Row(
               modifier = Modifier
                 .clip(MaterialTheme.shapes.small)

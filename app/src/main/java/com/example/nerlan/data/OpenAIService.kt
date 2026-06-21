@@ -158,7 +158,22 @@ object OpenAIService {
       if (out.isNotEmpty()) out.append('\n')
       // temperature 0: this is a mechanical punctuate-and-split task, so the model
       // must stay faithful and never drift into translating the foreign passages.
-      out.append(chat(system, piece, model, apiKey, temperature = 0.0).trim())
+      //
+      // Retry once on a transient failure, then fall back to the raw piece rather
+      // than throwing: a single hiccup must not collapse this piece (or, via the
+      // caller's raw fallback, the whole ~20-min chunk) into one unpunctuated
+      // run-on line. The kept-raw line still splits on any ASR punctuation in
+      // displaySentences.
+      var segmented: String? = null
+      for (attempt in 0..1) {
+        try {
+          segmented = chat(system, piece, model, apiKey, temperature = 0.0).trim()
+          break
+        } catch (e: Exception) {
+          if (attempt == 1) segmented = piece
+        }
+      }
+      out.append(segmented ?: piece)
     }
     return out.toString()
   }

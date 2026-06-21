@@ -397,11 +397,52 @@ class AIContentStore(private val context: Context) {
   }
 
   companion object {
-    /** The display sentences of a stored transcript: one trimmed, non-empty line
-     *  each. Must match how the transcript UI splits the same text so cues line up
-     *  one-to-one with the rendered rows. */
+    /** The display sentences of a stored transcript: one trimmed, non-empty
+     *  sentence each. Must match how the transcript UI splits the same text so cues
+     *  line up one-to-one with the rendered rows.
+     *
+     *  We split on newlines *and* on sentence-ending punctuation. The chat segmenter
+     *  normally returns one sentence per line, but when it fails (the raw ASR text
+     *  is used as-is) or a weaker model returns a run-on paragraph, a whole ~20-min
+     *  chunk can arrive as a single line — splitting on terminators too keeps the
+     *  transcript from showing a wall of run-together sentences. It is idempotent on
+     *  already-one-per-line text, so cue alignment stays 1:1. */
     fun displaySentences(text: String): List<String> =
-      text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+      text.split("\n").flatMap { splitSentences(it) }.map { it.trim() }.filter { it.isNotEmpty() }
+
+    /** Break one line into sentences at sentence-ending punctuation. Full-width CJK
+     *  enders (。！？) always end a sentence; half-width (. ! ?) only when followed by
+     *  whitespace or the line end, so decimals (3.14), ellipses (wait...) and the
+     *  like stay intact. A run of enders plus any trailing closing marks (」』”）) is
+     *  kept with the sentence it closes. */
+    private fun splitSentences(line: String): List<String> {
+      val cjkEnders = setOf('。', '！', '？')
+      val asciiEnders = setOf('.', '!', '?')
+      val closers = setOf('」', '』', '”', '’', '）', ')', '"', '\'')
+      val result = mutableListOf<String>()
+      var start = 0
+      var i = 0
+      while (i < line.length) {
+        val c = line[i]
+        val isEnder = when {
+          c in cjkEnders -> true
+          // End-of-line counts: the default ' ' makes the final char split.
+          c in asciiEnders -> (if (i + 1 < line.length) line[i + 1] else ' ').let { it == ' ' || it == '\t' }
+          else -> false
+        }
+        if (isEnder) {
+          var j = i + 1
+          while (j < line.length && (line[j] in cjkEnders || line[j] in asciiEnders || line[j] in closers)) j++
+          result.add(line.substring(start, j))
+          start = j
+          i = j
+        } else {
+          i++
+        }
+      }
+      if (start < line.length) result.add(line.substring(start))
+      return if (result.isEmpty()) listOf(line) else result
+    }
 
     /**
      * Map each cleaned display sentence to a start time by aligning it to the timed

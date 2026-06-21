@@ -134,9 +134,23 @@ fun TranscriptContent(
     onDispose { view.keepScreenOn = false }
   }
 
-  val sentences = remember(text, cues) {
-    if (!cues.isNullOrEmpty()) cues.map { it.text }
-    else text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+  // Live content streamed from the store while a job runs: prefer the partial, so a
+  // long episode shows its first chunk while later chunks transcribe (and the
+  // translation fills in per batch), then fall back to the saved file passed in.
+  val partialTranscripts by ai.partialTranscripts.collectAsState()
+  val partialTranslations by ai.partialTranslations.collectAsState()
+  val partial = partialTranscripts[episodeId]
+  val effectiveCues = partial?.cues?.takeIf { it.isNotEmpty() } ?: cues
+  val jobs by ai.jobs.collectAsState()
+  val transcriptRunningNote = (jobs["transcript:$episodeId"] as? AIContentStore.JobState.Running)?.note
+
+  val sentences = remember(text, cues, partial) {
+    when {
+      partial != null && partial.cues.isNotEmpty() -> partial.cues.map { it.text }
+      partial != null -> partial.sentences
+      !cues.isNullOrEmpty() -> cues.map { it.text }
+      else -> text.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
+    }
   }
   val clipboard = LocalClipboardManager.current
   val listState = rememberLazyListState()
@@ -155,15 +169,23 @@ fun TranscriptContent(
   val translation = remember(episodeId, revision, translationLanguage) {
     ai.translation(episodeId)?.takeIf { it.language == translationLanguage }?.sentences
   }
+  // In-flight translation for the current target language, streamed per batch — a
+  // growing prefix the view shows filling in. Null when none is running for this id.
+  val streamingTranslation = partialTranslations[episodeId]?.takeIf { it.language == translationLanguage }?.sentences
 
   // View mode: 0 = original, 1 = original + translation, 2 = translation only.
   // On open, honor the remembered preference only when a matching translation is
-  // already cached; otherwise show the original and never auto-trigger generation.
+  // already cached (or one is mid-flight); otherwise show the original and never
+  // auto-trigger generation.
   val translatePref by settings.transcriptTranslateMode.collectAsState()
   var translateMode by remember(episodeId) {
-    mutableStateOf(if (translatePref != 0 && translation != null) translatePref else 0)
+    mutableStateOf(if (translatePref != 0 && (translation != null || streamingTranslation != null)) translatePref else 0)
   }
-  var pendingMode by remember(episodeId) { mutableStateOf<Int?>(null) }
+  // Reopened mid-translation (no cached file yet): keep filling into the remembered
+  // mode by finalizing it when the job completes.
+  var pendingMode by remember(episodeId) {
+    mutableStateOf(if (translatePref != 0 && translation == null && streamingTranslation != null) translatePref else null)
+  }
   var errorMessage by remember { mutableStateOf<String?>(null) }
 
   // Apply a pending mode switch once its translation finishes, or surface failure.
@@ -172,11 +194,19 @@ fun TranscriptContent(
     when {
       translationJob is AIContentStore.JobState.Failed -> {
         errorMessage = translationJob.message; pendingMode = null
+        // Nothing committed (we may have switched early while streaming) — revert.
+        if (translation == null) translateMode = 0
       }
       translationJob == null && translation != null -> {
         translateMode = pm; settings.setTranscriptTranslateMode(pm); pendingMode = null
       }
     }
+  }
+  // Switch into the requested translated mode as soon as the first batch streams in,
+  // so the rows visibly fill instead of waiting for the whole job.
+  LaunchedEffect(streamingTranslation != null) {
+    val pm = pendingMode
+    if (streamingTranslation != null && pm != null && translateMode != pm) translateMode = pm
   }
 
   val current by PlayerManager.current.collectAsState()
@@ -185,9 +215,9 @@ fun TranscriptContent(
   // Sentence currently being spoken (index), or -1 when this isn't the playing
   // episode / there are no cues. derivedStateOf recomputes only when the index
   // actually changes, so the rows don't churn on every 0.5s position tick.
-  val activeIndex by remember(cues, episodeId) {
+  val activeIndex by remember(effectiveCues, episodeId) {
     derivedStateOf {
-      val c = cues
+      val c = effectiveCues
       if (c.isNullOrEmpty() || current?.id != episodeId) {
         -1
       } else {
@@ -204,7 +234,7 @@ fun TranscriptContent(
 
   // --- Shadowing state ------------------------------------------------------
   val isCurrentEpisode = current?.id == episodeId
-  val shadowingAvailable = isCurrentEpisode && !cues.isNullOrEmpty()
+  val shadowingAvailable = isCurrentEpisode && !effectiveCues.isNullOrEmpty()
   var shadowing by remember(episodeId) { mutableStateOf(false) }
   var shadowIndex by remember(episodeId) { mutableStateOf<Int?>(null) }
   val loopCount by settings.shadowLoopCount.collectAsState()
@@ -233,7 +263,7 @@ fun TranscriptContent(
   fun recordKey(i: Int) = "$episodeId-$i"
   // A sentence's span: its cue start to the next cue's start (duration for the last).
   fun regionFor(i: Int): Pair<Long, Long>? {
-    val c = cues ?: return null
+    val c = effectiveCues ?: return null
     if (i < 0 || i >= c.size) return null
     val startMs = (c[i].start * 1000).toLong()
     val endMs = if (i + 1 < c.size) (c[i + 1].start * 1000).toLong() else PlayerManager.durationMs.value
@@ -299,8 +329,8 @@ fun TranscriptContent(
   //    becomes active. e-ink disables animations system-wide anyway, and a
   //    continuous scroll would smear/ghost.
   if (scrollAnimated && !shadowing) {
-    LaunchedEffect(cues, episodeId) {
-      val c = cues
+    LaunchedEffect(effectiveCues, episodeId) {
+      val c = effectiveCues
       if (c.isNullOrEmpty()) return@LaunchedEffect
       PlayerManager.positionMs.collectLatest { pos ->
         if (PlayerManager.current.value?.id != episodeId) return@collectLatest
@@ -425,7 +455,7 @@ fun TranscriptContent(
         LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
           items(sentences.size) { i ->
             val active = i == highlightIndex
-            val translated = translation?.getOrNull(i)
+            val translated = (streamingTranslation ?: translation)?.getOrNull(i)
             // In translation-only mode, fall back to the original when a line has
             // no translation, so the row is never blank.
             val showOriginal = translateMode != 2 || translated.isNullOrEmpty()
@@ -461,13 +491,27 @@ fun TranscriptContent(
               }
             }
           }
+          // While the transcript is still streaming in, a footer shows the job's
+          // progress so the partial doesn't look like the whole episode.
+          transcriptRunningNote?.let { note ->
+            item {
+              Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+              ) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+              }
+            }
+          }
         }
       }
     }
 
     // Sentence-grained transport + recording, shown while shadowing.
     if (shadowing && shadowingAvailable) {
-      val count = cues?.size ?: 0
+      val count = effectiveCues.size
       var countMenuOpen by remember { mutableStateOf(false) }
       Row(
         verticalAlignment = Alignment.CenterVertically,

@@ -33,6 +33,12 @@ class AIContentStore(private val context: Context) {
     data class Failed(val message: String) : JobState
   }
 
+  /** A transcript still being produced, published per ~20-min audio chunk so the
+   *  viewer can show the first chunk while later chunks transcribe. [cues] is empty
+   *  or 1:1 with [sentences], never partially aligned. In-memory only — never
+   *  persisted or synced; the saved file is the source of truth once written. */
+  data class PartialTranscript(val sentences: List<String>, val cues: List<TranscriptCue>)
+
   private val transcriptsDir = File(context.filesDir, "ai/transcripts").apply { mkdirs() }
   private val handoutsDir = File(context.filesDir, "ai/handouts").apply { mkdirs() }
   /** Sidecar timestamp cues for transcripts, keyed by episode id. Synced as
@@ -54,6 +60,17 @@ class AIContentStore(private val context: Context) {
    *  it gets its own job map. */
   private val _translationJobs = MutableStateFlow<Map<String, JobState>>(emptyMap())
   val translationJobs: StateFlow<Map<String, JobState>> = _translationJobs
+
+  /** Transcript content streamed while a transcription job runs, keyed by episode
+   *  id; absence means use the saved file. See [PartialTranscript]. */
+  private val _partialTranscripts = MutableStateFlow<Map<String, PartialTranscript>>(emptyMap())
+  val partialTranscripts: StateFlow<Map<String, PartialTranscript>> = _partialTranscripts
+
+  /** Translation streamed per ~40-sentence batch while a translation job runs,
+   *  keyed by episode id, so the transcript screen fills in top-down. Carries the
+   *  target language so a partial for the wrong language is ignored. */
+  private val _partialTranslations = MutableStateFlow<Map<String, StoredTranslation>>(emptyMap())
+  val partialTranslations: StateFlow<Map<String, StoredTranslation>> = _partialTranslations
 
   /** episode id -> record, for every episode that has a transcript or handout.
    *  Powers the AI tab and supplies metadata for sync; backfilled from
@@ -180,6 +197,8 @@ class AIContentStore(private val context: Context) {
     persist()
     _jobs.value = emptyMap()
     _translationJobs.value = emptyMap()
+    _partialTranscripts.value = emptyMap()
+    _partialTranslations.value = emptyMap()
     _revision.value += 1
   }
 
@@ -188,7 +207,7 @@ class AIContentStore(private val context: Context) {
     when (kind) {
       // The cue + translation sidecars are derived from this transcript, so they
       // go with it (a regenerated transcript may re-segment differently).
-      AiKind.TRANSCRIPT -> { transcriptFile(id).delete(); cueFile(id).delete(); translationFile(id).delete(); _translationJobs.update { it - id } }
+      AiKind.TRANSCRIPT -> { transcriptFile(id).delete(); cueFile(id).delete(); translationFile(id).delete(); _translationJobs.update { it - id }; _partialTranscripts.update { it - id }; _partialTranslations.update { it - id } }
       AiKind.HANDOUT -> handoutFile(id).delete()
     }
     clearJob(key(kind, id))
@@ -220,8 +239,11 @@ class AIContentStore(private val context: Context) {
     return try {
       val source = audioFile(record) ?: throw Exception("找不到音訊檔")
       setJob(k, JobState.Running("轉錄中…"))
-      // Long episodes are split into chunks (the gpt-4o-transcribe models cap
-      // input at 1400 s); transcribe each and join.
+      // Long episodes are split into ~20-min chunks (the gpt-4o-transcribe models
+      // cap input at 1400 s). Each chunk is transcribed, re-segmented and aligned on
+      // its own, then appended and published — so the viewer can show the first
+      // chunk while later chunks are still transcribing, rather than waiting for the
+      // whole episode.
       val chunks = AudioTranscoder.transcodeChunks(context, record.id, Uri.fromFile(source), source)
       // A monolingual source (a podcast) carries its locale: force that language and
       // drop the Chinese teaching prompt, which would otherwise bias a foreign-language
@@ -229,46 +251,65 @@ class AIContentStore(private val context: Context) {
       // examples), so they keep the priming prompt and no forced language.
       val locale = record.audioLocale
       val prompt = if (locale == null) OpenAIService.transcriptionPrompt(record.language) else null
-      val segments = mutableListOf<OpenAIService.Segment>()
-      val raw = try {
-        val parts = mutableListOf<String>()
+      val multi = chunks.size > 1
+      val sentences = mutableListOf<String>()
+      val cues = mutableListOf<TranscriptCue>()
+      // Cues stay usable only while every chunk so far yields timestamps; once one
+      // doesn't (e.g. a non-whisper model), render without highlighting rather than
+      // with cues that drift out of alignment.
+      var cuesAligned = true
+      try {
         for ((i, chunk) in chunks.withIndex()) {
-          if (chunks.size > 1) setJob(k, JobState.Running("轉錄中…（${i + 1}/${chunks.size}）"))
+          setJob(k, JobState.Running(if (multi) "轉錄中…（${i + 1}/${chunks.size}）" else "轉錄中…"))
           val result = OpenAIService.transcribe(
             chunk, settings.transcriptionModelOrDefault(), settings.apiKey.value,
             prompt = prompt, language = locale)
-          parts += result.text
-          if (result.segments.isNotEmpty()) {
-            // Each chunk is transcoded 0-based, so shift its timestamps onto the
-            // absolute episode timeline by the chunk's start offset.
-            val offset = i * AudioTranscoder.MAX_CHUNK_SECONDS.toDouble()
-            segments += result.segments.map { OpenAIService.Segment(it.start + offset, it.text) }
-          }
+          // Each chunk is transcoded 0-based, so shift its timestamps onto the
+          // absolute episode timeline by the chunk's start offset.
+          val offset = i * AudioTranscoder.MAX_CHUNK_SECONDS.toDouble()
+          val chunkSegments = result.segments.map { OpenAIService.Segment(it.start + offset, it.text) }
+
+          // Re-segment just this chunk into one sentence per line (adds punctuation
+          // only, never alters content); keep its raw text if that fails so the paid
+          // transcription isn't lost. Then align its sentences to its own timestamps.
+          setJob(k, JobState.Running(if (multi) "整理句子中…（${i + 1}/${chunks.size}）" else "整理句子中…"))
+          val chunkText = runCatching {
+            OpenAIService.segmentTranscript(result.text, settings.chatModelOrDefault(), settings.apiKey.value)
+          }.getOrNull() ?: result.text
+          val chunkSentences = displaySentences(chunkText)
+          val chunkCues = alignCues(chunkSentences, chunkSegments)
+
+          sentences += chunkSentences
+          if (cuesAligned && chunkCues.size == chunkSentences.size) cues += chunkCues else cuesAligned = false
+
+          // Publish what's ready so an open viewer shows this chunk now. Only attach
+          // cues when they still line up 1:1 with the sentences.
+          val cuesSoFar = if (cuesAligned && cues.size == sentences.size) cues.toList() else emptyList()
+          _partialTranscripts.update { it + (record.id to PartialTranscript(sentences.toList(), cuesSoFar)) }
         }
-        parts.joinToString("\n")
       } finally {
         cleanupChunks(chunks, source)
       }
 
-      // Re-segment into one sentence per line (adds sentence-ending punctuation
-      // only, never alters content); keep the raw transcript if that fails.
-      setJob(k, JobState.Running("整理句子中…"))
-      val text = runCatching {
-        OpenAIService.segmentTranscript(raw, settings.chatModelOrDefault(), settings.apiKey.value)
-      }.getOrNull() ?: raw
-
+      val text = sentences.joinToString("\n")
       transcriptFile(record.id).writeText(text)
 
-      // Map each cleaned display sentence to the segment covering its first content
-      // character, so each gets a start time. Best effort: no segments (a non-whisper
-      // model) means no cue file and the transcript shows without highlighting.
-      val cues = alignCues(displaySentences(text), segments)
-      if (cues.isNotEmpty()) cueFile(record.id).writeText(json.encodeToString(cues)) else cueFile(record.id).delete()
+      // Best effort: no usable timestamps (a non-whisper model) means no cue file and
+      // the transcript shows without highlighting.
+      val alignedCues = if (cuesAligned && cues.size == sentences.size) cues else emptyList()
+      if (alignedCues.isNotEmpty()) cueFile(record.id).writeText(json.encodeToString(alignedCues))
+      else cueFile(record.id).delete()
 
+      // The saved file is now the source of truth; drop the streamed partial. Bump
+      // revision so the file-based views (panel, caption) re-read the finished text.
+      _partialTranscripts.update { it - record.id }
       noteRecord(record)
+      _revision.value += 1
       clearJob(k)
       text
     } catch (e: Exception) {
+      // Nothing was saved, so drop any streamed partial; the button shows failed.
+      _partialTranscripts.update { it - record.id }
       setJob(k, JobState.Failed(e.message ?: "處理失敗"))
       null
     }
@@ -317,13 +358,19 @@ class AIContentStore(private val context: Context) {
     _translationJobs.update { it + (id to JobState.Running("翻譯中…")) }
     try {
       val sentences = displaySentences(text)
+      // Publish each finished batch (~40 sentences) so the transcript screen fills
+      // in top-down instead of waiting for the whole transcript.
       val translated = OpenAIService.translateSentences(
-        sentences, language, settings.chatModelOrDefault(), settings.apiKey.value)
+        sentences, language, settings.chatModelOrDefault(), settings.apiKey.value,
+        onPartial = { soFar -> _partialTranslations.update { it + (id to StoredTranslation(language, soFar)) } })
       translationFile(id).writeText(json.encodeToString(StoredTranslation(language, translated)))
       noteRecord(record)
+      // The saved file is now the source of truth; drop the streamed partial.
+      _partialTranslations.update { it - id }
       _translationJobs.update { it - id }
       _revision.value += 1
     } catch (e: Exception) {
+      _partialTranslations.update { it - id }
       _translationJobs.update { it + (id to JobState.Failed(e.message ?: "翻譯失敗")) }
     }
   }

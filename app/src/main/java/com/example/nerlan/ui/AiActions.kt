@@ -84,6 +84,13 @@ fun AiActionButton(
   LaunchedEffect(failureMessage) {
     if (failureMessage != null && pendingOpen) { pendingOpen = false; errorMessage = failureMessage }
   }
+  // A transcript streams in per ~20-min chunk; open the viewer as soon as the first
+  // chunk is ready rather than waiting for the whole episode.
+  val partialTranscripts by ai.partialTranscripts.collectAsState()
+  val hasPartialTranscript = partialTranscripts.containsKey(record.id)
+  LaunchedEffect(hasPartialTranscript) {
+    if (hasPartialTranscript && pendingOpen && kind == AiKind.TRANSCRIPT) { pendingOpen = false; open() }
+  }
 
   fun start() {
     if (kind == AiKind.TRANSCRIPT) ai.processTranscript(record) else ai.processHandout(record)

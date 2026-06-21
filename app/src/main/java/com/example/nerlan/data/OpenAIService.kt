@@ -173,12 +173,17 @@ object OpenAIService {
    * batch's returned line count is reconciled to its input count (pad/truncate) so
    * a stray dropped/added line never shifts the alignment of everything after it.
    * Mirrors the iOS `translateSentences`.
+   *
+   * [onPartial], when given, is invoked after each batch with the cumulative
+   * translation so far (a growing prefix), so a caller can show the translation
+   * filling in instead of waiting for the whole transcript.
    */
   suspend fun translateSentences(
     sentences: List<String>,
     language: String,
     model: String,
     apiKey: String,
+    onPartial: ((List<String>) -> Unit)? = null,
   ): List<String> {
     if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
     if (sentences.isEmpty()) return emptyList()
@@ -199,6 +204,7 @@ object OpenAIService {
       while (lines.size > batch.size) lines.removeAt(lines.size - 1)
       while (lines.size < batch.size) lines.add("")
       out += lines
+      onPartial?.invoke(out.toList())
     }
     return out
   }

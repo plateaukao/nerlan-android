@@ -5,6 +5,7 @@ import android.net.Uri
 import com.example.nerlan.NerLanApp
 import java.io.File
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -395,33 +396,66 @@ class AIContentStore(private val context: Context) {
     /** Each handout "Part" covers at most this many seconds of audio (~15 min). */
     private const val HANDOUT_PART_SECONDS = 900
 
+    /** A final part shorter than this (10 min) is a stub: the last two parts merge
+     *  and re-split evenly so the episode doesn't end on a sliver. */
+    private const val HANDOUT_MIN_TAIL_SECONDS = 600
+
+    /**
+     * Cut points (in seconds) for a `duration`-second episode's handout parts:
+     * `[0, b1, …, duration]`, so part `i` spans `bounds[i]..bounds[i+1]`. Parts cap
+     * at ~15 min, but when the final part would run shorter than 10 min the last two
+     * parts merge and re-split evenly — e.g. 35 min yields `[0, 900, 1500, 2100]`
+     * (0–15, 15–25, 25–35) rather than `[0, 900, 1800, 2100]` (0–15, 15–30, 30–35).
+     * The single source of truth for both `handoutSegments` and `partTitle`, so the
+     * text split and the time labels always agree. Mirrors the iOS version.
+     */
+    fun handoutPartBoundaries(duration: Int): List<Int> {
+      val parts = maxOf(1, ceil(duration.toDouble() / HANDOUT_PART_SECONDS).toInt())
+      if (parts <= 1) return listOf(0, duration)
+      val bounds = ((0 until parts).map { it * HANDOUT_PART_SECONDS } + duration).toMutableList()
+      // bounds[parts] == duration; the last part spans bounds[parts-1]..duration.
+      if (duration - bounds[parts - 1] < HANDOUT_MIN_TAIL_SECONDS) {
+        val mergedStart = bounds[parts - 2]
+        bounds[parts - 1] = mergedStart + (duration - mergedStart) / 2
+      }
+      return bounds
+    }
+
     /**
      * Split the transcript into one segment per ~15-minute part. Returns a single
      * segment when the episode is ≤15 min (or its length is unknown and the
-     * transcript is short). Segments are balanced by character count and broken
-     * only at line (sentence) boundaries. Mirrors the iOS `handoutSegments`.
+     * transcript is short). When the duration is known each part's text is sized in
+     * proportion to its `handoutPartBoundaries` time span (assuming a roughly
+     * constant speaking rate), so the segments line up with the Part I/II/III time
+     * labels; with an unknown duration they fall back to equal character counts.
+     * Breaks land only at line (sentence) boundaries. Mirrors the iOS version.
      */
     fun handoutSegments(transcript: String, durationSeconds: Int?): List<String> {
-      val parts = if (durationSeconds != null && durationSeconds > 0) {
-        maxOf(1, ceil(durationSeconds.toDouble() / HANDOUT_PART_SECONDS).toInt())
+      val total = transcript.length
+      // Cumulative character counts at which to cut, one per internal boundary.
+      val cutAt: List<Int> = if (durationSeconds != null && durationSeconds > 0) {
+        val bounds = handoutPartBoundaries(durationSeconds)
+        if (bounds.size <= 2) return listOf(transcript)   // single part
+        bounds.drop(1).dropLast(1).map { (total.toDouble() * it / durationSeconds).roundToInt() }
       } else {
-        // Unknown duration: ~3500 chars ≈ 15 min of speech.
-        maxOf(1, ceil(transcript.length / 3500.0).toInt())
+        // Unknown duration: ~3500 chars ≈ 15 min of speech, split evenly.
+        val parts = maxOf(1, ceil(total / 3500.0).toInt())
+        if (parts <= 1) return listOf(transcript)
+        (1 until parts).map { total * it / parts }
       }
-      if (parts <= 1) return listOf(transcript)
 
-      val target = maxOf(1, transcript.length / parts)
       val segments = mutableListOf<String>()
       val current = StringBuilder()
-      var currentChars = 0
+      var cumChars = 0
+      var next = 0
       for (line in transcript.split("\n")) {
         if (current.isNotEmpty()) current.append('\n')
         current.append(line)
-        currentChars += line.length + 1
-        if (currentChars >= target && segments.size < parts - 1) {
+        cumChars += line.length + 1
+        if (next < cutAt.size && cumChars >= cutAt[next]) {
           segments += current.toString()
           current.setLength(0)
-          currentChars = 0
+          next += 1
         }
       }
       if (current.isNotEmpty()) segments += current.toString()
@@ -429,13 +463,14 @@ class AIContentStore(private val context: Context) {
     }
 
     /** "Part I（00:00–15:00）" — Roman numeral plus the part's audio time range
-     *  (range omitted when the duration is unknown). */
+     *  (range omitted when the duration is unknown). The range comes from
+     *  `handoutPartBoundaries`, the same cut points `handoutSegments` splits on. */
     fun partTitle(index: Int, total: Int, duration: Int?): String {
       val label = "Part ${romanNumeral(index + 1)}"
       if (duration == null || duration <= 0) return label
-      val start = index * HANDOUT_PART_SECONDS
-      val end = if (index == total - 1) duration else (index + 1) * HANDOUT_PART_SECONDS
-      return "$label（${timeStamp(start)}–${timeStamp(end)}）"
+      val bounds = handoutPartBoundaries(duration)
+      if (index + 1 >= bounds.size) return label
+      return "$label（${timeStamp(bounds[index])}–${timeStamp(bounds[index + 1])}）"
     }
 
     private fun timeStamp(seconds: Int): String {

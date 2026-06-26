@@ -472,14 +472,18 @@ fun TranscriptContent(
                 Text(
                   sentences[i],
                   fontSize = bodySize.sp,
+                  // Scale line spacing with the font so enlarged text doesn't crowd.
+                  lineHeight = (bodySize * 1.5f).sp,
                   fontWeight = if (active) FontWeight.SemiBold else null,
                   color = if (active) MaterialTheme.colorScheme.primary else Color.Unspecified,
                 )
               }
               if (translateMode != 0 && !translated.isNullOrEmpty()) {
+                val translatedSize = if (translateMode == 2) bodySize else bodySize - 2
                 Text(
                   translated,
-                  fontSize = (if (translateMode == 2) bodySize else bodySize - 2).sp,
+                  fontSize = translatedSize.sp,
+                  lineHeight = (translatedSize * 1.5f).sp,
                   fontWeight = if (active && translateMode == 2) FontWeight.SemiBold else null,
                   color = if (translateMode == 2) {
                     if (active) MaterialTheme.colorScheme.primary else Color.Unspecified

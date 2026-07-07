@@ -1,5 +1,6 @@
 package com.example.nerlan.player
 
+import android.app.PendingIntent
 import android.content.Intent
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -34,8 +35,19 @@ class PlaybackService : MediaSessionService() {
         /* handleAudioFocus = */ true,
       )
       .setHandleAudioBecomingNoisy(true)
+      // Hold a wake (and wifi) lock while playing: without it, screen-off
+      // *streaming* stalls once the buffer drains and the device dozes. The
+      // manifest already declares WAKE_LOCK; harmless for local files.
+      .setWakeMode(C.WAKE_MODE_NETWORK)
       .build()
-    mediaSession = MediaSession.Builder(this, player).build()
+    // Without a session activity the media notification has no content intent —
+    // tapping the lock-screen/notification card would do nothing.
+    val openApp = packageManager.getLaunchIntentForPackage(packageName)?.let {
+      PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
+    }
+    mediaSession = MediaSession.Builder(this, player)
+      .apply { openApp?.let(::setSessionActivity) }
+      .build()
   }
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =

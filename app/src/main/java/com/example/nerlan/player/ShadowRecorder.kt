@@ -40,6 +40,11 @@ object ShadowRecorder {
   fun hasRecording(key: String): Boolean = file(key).exists()
 
   fun startRecording(key: String) {
+    // A second start while one is live (fast double tap — the button's
+    // `recording` snapshot can lag the StateFlow — or the loop-finish
+    // auto-record racing a manual tap) would overwrite [recorder] and orphan a
+    // running MediaRecorder that holds the mic until process death.
+    if (recorder != null) stopRecording(thenPlay = false)
     stopPlayback()
     PlayerManager.clearLoop()
     PlayerManager.pause()

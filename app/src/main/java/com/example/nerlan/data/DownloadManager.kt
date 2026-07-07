@@ -7,8 +7,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.json.Json
 import okhttp3.Request
@@ -41,6 +44,20 @@ class DownloadManager(filesDir: File) {
       .getOrNull() ?: emptyList()
   )
   val records: StateFlow<List<EpisodeRecord>> = _records
+
+  /** Serializes downloads.json writes: up to 3 download coroutines finish
+   *  concurrently (plus deletes from the main thread), and two interleaved
+   *  writeText calls can corrupt the file. The value is re-read inside the
+   *  lock so the last write always carries the newest state. */
+  private val recordsWriteMutex = Mutex()
+
+  private fun persistRecords() {
+    scope.launch {
+      recordsWriteMutex.withLock {
+        runCatching { recordsFile.writeText(json.encodeToString(_records.value)) }
+      }
+    }
+  }
 
   /** episodeId -> 0f..1f while a download is in flight */
   private val _progress = MutableStateFlow<Map<String, Float>>(emptyMap())
@@ -89,7 +106,7 @@ class DownloadManager(filesDir: File) {
   private fun downloadAudio(record: EpisodeRecord) {
     val url = record.audio ?: return
     if (isDownloaded(record.id) || isDownloading(record.id)) return
-    _progress.value += (record.id to 0f)
+    _progress.update { it + (record.id to 0f) }
     scope.launch {
       audioSemaphore.withPermit {
         val dest = audioFileFor(record)
@@ -118,7 +135,7 @@ class DownloadManager(filesDir: File) {
                     val step = (copied * 10 / total).toInt().coerceAtMost(10)
                     if (step != lastStep) {
                       lastStep = step
-                      _progress.value += (record.id to step / 10f)
+                      _progress.update { it + (record.id to step / 10f) }
                     }
                   }
                 }
@@ -127,14 +144,15 @@ class DownloadManager(filesDir: File) {
           }
           tmp.renameTo(dest)
           downloadedFiles[record.id] = dest
-          if (_records.value.none { it.id == record.id }) {
-            _records.value += record
-            recordsFile.writeText(json.encodeToString(_records.value))
-          }
+          _records.update { rs -> if (rs.any { it.id == record.id }) rs else rs + record }
+          persistRecords()
         } catch (_: Exception) {
           tmp.delete()
         } finally {
-          _progress.value -= record.id
+          // update {} (CAS), not value -=: concurrent finishes doing plain
+          // read-modify-writes can lose the removal, leaving a stuck spinner
+          // and an episode that can never be re-downloaded until restart.
+          _progress.update { it - record.id }
         }
       }
     }
@@ -178,7 +196,7 @@ class DownloadManager(filesDir: File) {
     _records.value.firstOrNull { it.id == episodeId }?.attachments.orEmpty().forEach {
       attachmentFileFor(it).delete()
     }
-    _records.value = _records.value.filterNot { it.id == episodeId }
-    recordsFile.writeText(json.encodeToString(_records.value))
+    _records.update { rs -> rs.filterNot { it.id == episodeId } }
+    persistRecords()
   }
 }

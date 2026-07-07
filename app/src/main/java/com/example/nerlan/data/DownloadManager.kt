@@ -46,25 +46,36 @@ class DownloadManager(filesDir: File) {
   private val _progress = MutableStateFlow<Map<String, Float>>(emptyMap())
   val progress: StateFlow<Map<String, Float>> = _progress
 
-  /** Extensions an episode might be stored under: NER is always mp3, podcasts can
-   *  be m4a/aac/etc. Probed in order, so the mp3 common case hits first. */
-  private val audioExtensions = listOf("mp3", "m4a", "aac", "ogg", "opus", "wav", "mp4")
-
   /** Where an episode's audio is stored, using its declared extension. */
   private fun audioFileFor(record: EpisodeRecord) = File(audioDir, "${record.id}.${record.audioFileExtension}")
 
-  /** The downloaded audio file for an id, whatever extension it was saved with. */
-  private fun existingAudioFile(episodeId: String): File? =
-    audioExtensions.asSequence().map { File(audioDir, "$episodeId.$it") }.firstOrNull { it.exists() }
+  /** episodeId -> completed audio file, seeded by one directory scan. The UI
+   *  asks isDownloaded per visible row per recomposition; probing the
+   *  filesystem there (formerly up to 7 File.exists per call) did hundreds of
+   *  redundant stats while scrolling. Interrupted downloads also left stale
+   *  .part files behind forever — swept here at startup. */
+  private val downloadedFiles = ConcurrentHashMap<String, File>()
+
+  init {
+    listOf(audioDir, attachmentsDir).forEach { dir ->
+      dir.listFiles()?.forEach { f ->
+        when {
+          !f.isFile -> {}
+          f.name.endsWith(".part") -> f.delete()
+          dir === audioDir -> downloadedFiles[f.nameWithoutExtension] = f
+        }
+      }
+    }
+  }
 
   private fun attachmentFileFor(attachment: Attachment) =
     File(attachmentsDir, "${attachment.attachmentKey}.${attachment.fileExtension}")
 
-  fun isDownloaded(episodeId: String) = existingAudioFile(episodeId) != null
+  fun isDownloaded(episodeId: String) = downloadedFiles.containsKey(episodeId)
 
   fun isDownloading(episodeId: String) = _progress.value.containsKey(episodeId)
 
-  fun localPath(episodeId: String): String? = existingAudioFile(episodeId)?.absolutePath
+  fun localPath(episodeId: String): String? = downloadedFiles[episodeId]?.absolutePath
 
   /** Local copy of an attachment, if it has been downloaded. */
   fun localAttachmentPath(attachment: Attachment): String? =
@@ -115,6 +126,7 @@ class DownloadManager(filesDir: File) {
             }
           }
           tmp.renameTo(dest)
+          downloadedFiles[record.id] = dest
           if (_records.value.none { it.id == record.id }) {
             _records.value += record
             recordsFile.writeText(json.encodeToString(_records.value))
@@ -162,7 +174,7 @@ class DownloadManager(filesDir: File) {
   fun attachmentCount(): Int = attachmentsDir.listFiles()?.count { it.isFile } ?: 0
 
   fun delete(episodeId: String) {
-    existingAudioFile(episodeId)?.delete()
+    downloadedFiles.remove(episodeId)?.delete()
     _records.value.firstOrNull { it.id == episodeId }?.attachments.orEmpty().forEach {
       attachmentFileFor(it).delete()
     }

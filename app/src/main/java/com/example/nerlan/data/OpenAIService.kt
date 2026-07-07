@@ -214,14 +214,26 @@ object OpenAIService {
     for (batch in lineBatches(sentences, maxLines = 40, maxChars = 3000)) {
       // temperature 0: keep the mapping faithful and the line count stable.
       val raw = chat(system, batch.joinToString("\n"), model, apiKey, temperature = 0.0)
-      val lines = raw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
-      // Reconcile to the batch's line count so indices never drift.
-      while (lines.size > batch.size) lines.removeAt(lines.size - 1)
-      while (lines.size < batch.size) lines.add("")
-      out += lines
+      out += reconcileBatch(raw, batch.size)
       onPartial?.invoke(out.toList())
     }
     return out
+  }
+
+  /** Reconcile a translation batch's raw model output to exactly [expected]
+   *  lines so indices never drift. Interior empty lines are kept in place —
+   *  the prompt's rule 3 lets the model answer a punctuation-only line with a
+   *  blank, and dropping one would shift every later sentence in the batch
+   *  onto the wrong translation. Only the padding around the block is
+   *  stripped; extras are cut from the end, missing lines padded as "". */
+  internal fun reconcileBatch(raw: String, expected: Int): List<String> {
+    val lines = raw.split("\n").map { it.trim() }
+      .dropWhile { it.isEmpty() }
+      .dropLastWhile { it.isEmpty() }
+      .toMutableList()
+    while (lines.size > expected) lines.removeAt(lines.size - 1)
+    while (lines.size < expected) lines.add("")
+    return lines
   }
 
   /** Group whole sentences into batches of at most [maxLines] lines or [maxChars]

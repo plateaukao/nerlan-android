@@ -51,7 +51,9 @@ import com.example.nerlan.data.ChannelPlusApi
 import com.example.nerlan.data.DownloadManager
 import java.io.Closeable
 import java.io.File
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -202,10 +204,12 @@ private class PdfDocument(file: File) : Closeable {
   private val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
   private val renderer = PdfRenderer(descriptor)
   private val mutex = Mutex()
+  @Volatile private var closed = false
 
   val pageCount: Int get() = renderer.pageCount
 
-  suspend fun renderPage(index: Int, widthPx: Int): ImageBitmap = mutex.withLock {
+  suspend fun renderPage(index: Int, widthPx: Int): ImageBitmap? = mutex.withLock {
+    if (closed) return@withLock null
     withContext(Dispatchers.IO) {
       renderer.openPage(index).use { page ->
         val scale = widthPx.toFloat() / page.width
@@ -219,8 +223,19 @@ private class PdfDocument(file: File) : Closeable {
   }
 
   override fun close() {
-    runCatching { renderer.close() }
-    runCatching { descriptor.close() }
+    // Never tear down under a live render: page.render is native and not
+    // cancellable, and closing the renderer with a page open throws (leaving
+    // it open forever) — worse, the descriptor would be closed beneath native
+    // code. Mark closed (renders started after this return null) and release
+    // once the render mutex is free; dismissing the viewer mid-render must
+    // not block the UI thread on the page finishing.
+    closed = true
+    CoroutineScope(Dispatchers.IO).launch {
+      mutex.withLock {
+        runCatching { renderer.close() }
+        runCatching { descriptor.close() }
+      }
+    }
   }
 }
 

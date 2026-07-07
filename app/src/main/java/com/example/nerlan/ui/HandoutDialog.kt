@@ -69,6 +69,8 @@ fun HandoutContent(
         }
       },
       update = { it.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null) },
+      // Detaching alone leaves the native WebView alive until finalization.
+      onRelease = { it.destroy() },
       modifier = Modifier.fillMaxSize(),
     )
   }

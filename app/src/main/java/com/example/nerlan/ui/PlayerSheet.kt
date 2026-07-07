@@ -72,8 +72,6 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   val panel = LocalStudyPanel.current
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
-  val positionMs by PlayerManager.positionMs.collectAsState()
-  val durationMs by PlayerManager.durationMs.collectAsState()
   val hasNext by PlayerManager.hasNext.collectAsState()
   val hasPrevious by PlayerManager.hasPrevious.collectAsState()
   val rate by PlayerManager.playbackRate.collectAsState()
@@ -83,8 +81,6 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   val downloadRecords by downloads.records.collectAsState()
   val aiRevision by ai.revision.collectAsState()
 
-  var isScrubbing by remember { mutableStateOf(false) }
-  var scrubPosition by remember { mutableFloatStateOf(0f) }
   var speedMenuOpen by remember { mutableStateOf(false) }
   var showAttachment by remember { mutableStateOf(false) }
   var showShadowDialog by remember { mutableStateOf(false) }
@@ -154,34 +150,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         )
       }
 
-      // Scrubber
-      Slider(
-        value = if (isScrubbing) scrubPosition else positionMs.toFloat(),
-        onValueChange = {
-          isScrubbing = true
-          scrubPosition = it
-        },
-        onValueChangeFinished = {
-          PlayerManager.seekTo(scrubPosition.toLong())
-          isScrubbing = false
-        },
-        valueRange = 0f..maxOf(durationMs.toFloat(), 1f),
-        modifier = Modifier.padding(top = 8.dp),
-      )
-      Row(Modifier.fillMaxWidth()) {
-        Text(
-          formatTime(if (isScrubbing) scrubPosition.toLong() else positionMs),
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-          formatTime(durationMs),
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          textAlign = TextAlign.End,
-          modifier = Modifier.weight(1f),
-        )
-      }
+      PositionScrubber()
 
       // Transport
       Row(
@@ -259,7 +228,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           }
         }
 
-        val isFav = favEpisodes.any { it.id == record.id }
+        val isFav = remember(favEpisodes, record.id) { favEpisodes.any { it.id == record.id } }
         TextButton(onClick = { favorites.toggle(record) }, contentPadding = controlPadding) {
           Icon(
             if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -292,7 +261,11 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           }
         }
 
-        val isDownloaded = downloadRecords.any { it.id == record.id } || downloads.isDownloaded(record.id)
+        // isDownloaded probes the filesystem — don't re-run it on unrelated
+        // recompositions of the sheet.
+        val isDownloaded = remember(downloadRecords, record.id) {
+          downloadRecords.any { it.id == record.id } || downloads.isDownloaded(record.id)
+        }
         val progress = progressMap[record.id]
         when {
           isDownloaded -> Row(
@@ -380,12 +353,52 @@ fun PlayerSheet(onDismiss: () -> Unit) {
       if (showShadowDialog) {
         TranscriptDialog(
           record,
-          ai.transcriptText(record.id).orEmpty(),
+          // remember: an unmemoized read would re-read the whole file from disk
+          // on every recomposition of the sheet for as long as the dialog is open.
+          remember(record.id, aiRevision) { ai.transcriptText(record.id).orEmpty() },
           onDismiss = { showShadowDialog = false },
           cues = captionCues,
           startShadowing = true,
         )
       }
     }
+  }
+}
+
+/** Scrubber + time labels. Collects the 500ms position tick itself so only this
+ *  composable recomposes twice a second — read in the sheet body, the tick would
+ *  re-execute the whole sheet (transport, favorite scan, download check…). */
+@Composable
+private fun PositionScrubber() {
+  val positionMs by PlayerManager.positionMs.collectAsState()
+  val durationMs by PlayerManager.durationMs.collectAsState()
+  var isScrubbing by remember { mutableStateOf(false) }
+  var scrubPosition by remember { mutableFloatStateOf(0f) }
+  Slider(
+    value = if (isScrubbing) scrubPosition else positionMs.toFloat(),
+    onValueChange = {
+      isScrubbing = true
+      scrubPosition = it
+    },
+    onValueChangeFinished = {
+      PlayerManager.seekTo(scrubPosition.toLong())
+      isScrubbing = false
+    },
+    valueRange = 0f..maxOf(durationMs.toFloat(), 1f),
+    modifier = Modifier.padding(top = 8.dp),
+  )
+  Row(Modifier.fillMaxWidth()) {
+    Text(
+      formatTime(if (isScrubbing) scrubPosition.toLong() else positionMs),
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    Text(
+      formatTime(durationMs),
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      textAlign = TextAlign.End,
+      modifier = Modifier.weight(1f),
+    )
   }
 }

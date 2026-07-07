@@ -171,13 +171,15 @@ class AIContentStore(private val context: Context) {
 
   fun processTranscript(record: EpisodeRecord) {
     val k = key(AiKind.TRANSCRIPT, record.id)
-    if (_jobs.value.containsKey(k) || hasTranscript(record.id)) return
+    // Only a *running* job blocks a new one — a Failed entry must not, or the
+    // error dialog's 重試 button would be a permanent no-op.
+    if (_jobs.value[k] is JobState.Running || hasTranscript(record.id)) return
     scope.launch { runTranscript(record) }
   }
 
   fun processHandout(record: EpisodeRecord) {
     val k = key(AiKind.HANDOUT, record.id)
-    if (_jobs.value.containsKey(k) || hasHandout(record.id)) return
+    if (_jobs.value[k] is JobState.Running || hasHandout(record.id)) return
     scope.launch { runHandout(record) }
   }
 

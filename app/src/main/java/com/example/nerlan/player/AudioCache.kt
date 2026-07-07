@@ -10,7 +10,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.FileDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
-import androidx.media3.datasource.cache.NoOpCacheEvictor
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import java.io.File
 
@@ -28,6 +28,12 @@ import java.io.File
  * played episode keeps the ranges it fetched.
  */
 object AudioCache {
+  /** Cap for the streamed-audio cache. Unbounded, a daily streamer accrues
+   *  gigabytes that the OS eventually purges wholesale under storage pressure —
+   *  exactly when the offline replay was most wanted. LRU keeps the most
+   *  recently played ~2 GB (roughly 30–60 spoken-audio episodes). */
+  private const val MAX_BYTES = 2L * 1024 * 1024 * 1024
+
   private var cache: SimpleCache? = null
 
   private fun cacheDir(context: Context) =
@@ -37,7 +43,7 @@ object AudioCache {
   private fun simpleCache(context: Context): SimpleCache =
     cache ?: SimpleCache(
       cacheDir(context),
-      NoOpCacheEvictor(),
+      LeastRecentlyUsedCacheEvictor(MAX_BYTES),
       StandaloneDatabaseProvider(context.applicationContext),
     ).also { cache = it }
 

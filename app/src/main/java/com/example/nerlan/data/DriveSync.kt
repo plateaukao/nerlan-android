@@ -11,6 +11,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
 import com.google.android.gms.common.api.Scope
 import java.io.File
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -136,31 +137,41 @@ class DriveSync(private val context: Context) {
    * finishing). Coalesces a burst of changes into one sync ~2.5s after the last
    * one. No-op unless sync is on and signed in.
    */
+  @Synchronized
   fun requestSync() {
     if (!NerLanApp.instance.settings.syncToDrive.value || _accountEmail.value == null) return
+    // Restarting the debounce must only reset the *delay*. The sync runs in its
+    // own job: were it inside the debounce job, the next local change would
+    // cancel an upload already in flight and surface the cancellation as a
+    // sync failure. (@Synchronized: callers come from the main thread, the AI
+    // store's IO scope and the player — an unguarded swap could leave two live
+    // debounce jobs.)
     debounceJob?.cancel()
     debounceJob = scope.launch {
       delay(2_500)
-      runSyncWithStatus()
+      scope.launch { runSyncWithStatus() }
     }
   }
 
   private suspend fun runSyncWithStatus() {
     _status.value = "同步中…"
-    runCatching { syncMutex.withLock { sync() } }
-      .onSuccess { (up, down) -> _status.value = "已同步（↑$up ↓$down）" }
-      .onFailure {
-        _status.value = when (it) {
-          // GMS needs re-consent, or the browser session expired (which already
-          // cleared itself). Refresh the email so a cleared browser session flips
-          // the UI back to the login button.
-          is UserRecoverableAuthException, is ReauthRequired -> {
-            _accountEmail.value = auth.email
-            "需要重新授權，請重新登入"
-          }
-          else -> "同步失敗：${it.message}"
+    try {
+      val (up, down) = syncMutex.withLock { sync() }
+      _status.value = "已同步（↑$up ↓$down）"
+    } catch (e: CancellationException) {
+      throw e   // scope teardown, not a sync failure
+    } catch (e: Exception) {
+      _status.value = when (e) {
+        // GMS needs re-consent, or the browser session expired (which already
+        // cleared itself). Refresh the email so a cleared browser session flips
+        // the UI back to the login button.
+        is UserRecoverableAuthException, is ReauthRequired -> {
+          _accountEmail.value = auth.email
+          "需要重新授權，請重新登入"
         }
+        else -> "同步失敗：${e.message}"
       }
+    }
   }
 
   // MARK: - Sync engine
@@ -451,22 +462,36 @@ class DriveSync(private val context: Context) {
 
   // MARK: - Drive REST (over OkHttp)
 
-  @Serializable private data class FileList(val files: List<DriveFile> = emptyList())
+  @Serializable private data class FileList(
+    val files: List<DriveFile> = emptyList(),
+    val nextPageToken: String? = null,
+  )
   @Serializable private data class DriveFile(val id: String, val name: String, val modifiedTime: String? = null)
   @Serializable private data class UploadMeta(val name: String, val parents: List<String>)
   @Serializable private data class UploadResult(val id: String = "", val modifiedTime: String? = null)
 
   private fun listFiles(token: String): List<DriveFile> {
-    val url = "https://www.googleapis.com/drive/v3/files".toHttpUrl().newBuilder()
-      .addQueryParameter("spaces", "appDataFolder")
-      .addQueryParameter("fields", "files(id,name,modifiedTime)")
-      .addQueryParameter("pageSize", "1000")
-      .build()
-    val req = Request.Builder().url(url).header("Authorization", "Bearer $token").build()
-    client.newCall(req).execute().use { resp ->
-      if (!resp.isSuccessful) error("Drive list ${resp.code}")
-      return json.decodeFromString<FileList>(resp.body!!.string()).files
-    }
+    // Follow nextPageToken: with 4 content files per episode plus stats blobs, a
+    // heavy library exceeds one page — and a file the listing misses would be
+    // re-uploaded as a duplicate on every sync (Drive allows duplicate names).
+    val all = mutableListOf<DriveFile>()
+    var pageToken: String? = null
+    do {
+      val url = "https://www.googleapis.com/drive/v3/files".toHttpUrl().newBuilder()
+        .addQueryParameter("spaces", "appDataFolder")
+        .addQueryParameter("fields", "nextPageToken,files(id,name,modifiedTime)")
+        .addQueryParameter("pageSize", "1000")
+        .apply { pageToken?.let { addQueryParameter("pageToken", it) } }
+        .build()
+      val req = Request.Builder().url(url).header("Authorization", "Bearer $token").build()
+      client.newCall(req).execute().use { resp ->
+        if (!resp.isSuccessful) error("Drive list ${resp.code}")
+        val page = json.decodeFromString<FileList>(resp.body!!.string())
+        all += page.files
+        pageToken = page.nextPageToken
+      }
+    } while (pageToken != null)
+    return all
   }
 
   private fun downloadBytes(token: String, id: String): ByteArray {

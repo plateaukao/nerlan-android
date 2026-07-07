@@ -14,6 +14,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -162,8 +164,32 @@ class ListeningStatsStore(context: Context) {
     unsaved = 0.0
     pruneLocked()
     val snap = snapshotLocked()
-    scope.launch { runCatching { ownFile.writeText(json.encodeToString(snap)) } }
+    // Writes are async on a parallel dispatcher, so successive persists (a 5s
+    // tick racing the pause flush) could interleave or land out of order —
+    // rolling the file back or corrupting it, which init silently reads as
+    // "no stats" and then syncs to Drive as this device's truth. A mutex
+    // serializes writers, the sequence number drops stale snapshots (seq is
+    // taken under [lock], so it matches snapshot order), and temp+rename keeps
+    // the file whole across a mid-write process death.
+    val seq = writeSeq + 1
+    writeSeq = seq
+    scope.launch {
+      writeMutex.withLock {
+        if (seq <= writtenSeq) return@withLock
+        writtenSeq = seq
+        runCatching {
+          val tmp = File(ownFile.path + ".tmp")
+          tmp.writeText(json.encodeToString(snap))
+          tmp.renameTo(ownFile)
+        }
+      }
+    }
   }
+
+  private val writeMutex = Mutex()
+  private var writeSeq = 0L
+  /** Highest sequence actually written; guarded by [writeMutex]. */
+  private var writtenSeq = 0L
 
   /** Drop daily buckets older than ~400 days so the blob stays tiny for sync. */
   private fun pruneLocked() {

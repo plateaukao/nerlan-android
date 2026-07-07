@@ -129,10 +129,13 @@ class ListeningStatsStore(context: Context) {
     _revision.value += 1
   }
 
-  /** Persist and request a sync now — call on pause / when leaving an episode. */
+  /** Persist the tally now — call on pause / when leaving an episode. Local
+   *  only: shadowing pauses after every finite sentence loop, so syncing here
+   *  would round-trip Drive once per practiced sentence. The ON_STOP observer
+   *  (NerLanApp) syncs when the app backgrounds, and noteCompleted syncs the
+   *  rarer real milestones. */
   fun flush() {
     synchronized(lock) { persistLocalLocked() }
-    NerLanApp.instance.drive.requestSync()
   }
 
   // MARK: - Persistence

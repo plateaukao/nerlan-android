@@ -46,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.example.nerlan.data.PodcastFeed
 import com.example.nerlan.data.Program
@@ -178,11 +179,16 @@ fun MainScreen() {
 private fun TabContainer(active: Boolean, content: @Composable () -> Unit) {
   Box(
     Modifier.fillMaxSize().layout { measurable, constraints ->
-      val placeable = measurable.measure(constraints)
       if (active) {
+        val placeable = measurable.measure(constraints)
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
       } else {
-        // Composed (state retained) but not placed: nothing drawn or touchable.
+        // Composed (state retained) but neither placed nor really measured: a
+        // zero-size viewport makes a LazyColumn compose no items, so a hidden
+        // tab stops re-measuring its rows whenever their (invisible) state —
+        // now-playing, download progress — changes. Scroll positions survive
+        // in the LazyListStates.
+        measurable.measure(Constraints.fixed(0, 0))
         layout(0, 0) {}
       }
     },

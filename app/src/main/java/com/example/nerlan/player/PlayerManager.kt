@@ -180,7 +180,11 @@ object PlayerManager {
     val c = controller ?: return
     clearLoop()   // a sentence loop never carries across episodes
     val playable = queue.filter { it.audio != null }
-    val index = playable.indexOfFirst { it.id == record.id }.coerceAtLeast(0)
+    val index = playable.indexOfFirst { it.id == record.id }
+    // A record without audio (e.g. a NER episode with no voice ref) isn't in
+    // playable — starting anyway would play whatever sits at index 0, and an
+    // empty queue would hit STATE_ENDED and log a bogus completion.
+    if (index < 0) return
     c.setMediaItems(playable.map(::mediaItemOf), index, 0)
     c.prepare()
     c.play()

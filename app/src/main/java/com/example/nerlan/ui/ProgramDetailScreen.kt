@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +56,9 @@ import com.example.nerlan.data.EpisodeRecord
 import com.example.nerlan.data.ChannelPlusApi
 import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Program info plus its full episode archive (infinite scroll, oldest first). */
@@ -72,7 +76,6 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
   var isRefreshing by remember { mutableStateOf(false) }
   var initialized by remember { mutableStateOf(false) }
   var showFullIntro by remember { mutableStateOf(false) }
-  var loadTrigger by remember { mutableIntStateOf(0) }
   val favoritePrograms by favorites.programs.collectAsState()
   val isFavProgram = favoritePrograms.any { it.programId == program.programId }
 
@@ -104,13 +107,18 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
       totalCount = cached.totalCount
     }
     initialized = true
-    loadTrigger += 1
   }
 
   // Infinite scroll: fetch the next page near the end (and page 1 when there was
   // no cache). Persists each page so reopening the program skips the network.
-  LaunchedEffect(loadTrigger, nearEnd, initialized) {
-    if (initialized && !isLoading && (page == 0 || (nearEnd && page < totalPages))) {
+  // One long-lived effect owns the whole fetch loop: keying it on nearEnd would
+  // cancel an in-flight request whenever the flag flips — and the spinner row
+  // itself shifts totalItemsCount, so resting at the threshold could thrash
+  // cancel/re-request cycles for the same page.
+  LaunchedEffect(Unit) {
+    snapshotFlow { initialized }.first { it }
+    while (true) {
+      snapshotFlow { page == 0 || (nearEnd && page < totalPages) }.first { it }
       isLoading = true
       try {
         val result = ChannelPlusApi.episodes(program.programId, page + 1)
@@ -120,11 +128,14 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
         totalPages = result.totalPages
         totalCount = result.totalCount
         persist()
+      } catch (e: CancellationException) {
+        throw e
       } catch (_: Exception) {
-        // keep what we have; scrolling retriggers
+        // Keep what we have, but back off so a dead network doesn't hammer
+        // the API while the list sits at the threshold.
+        delay(2_000)
       }
       isLoading = false
-      loadTrigger += 1
     }
   }
 

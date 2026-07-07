@@ -6,9 +6,12 @@ import com.example.nerlan.NerLanApp
 import java.io.File
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -174,13 +177,36 @@ class AIContentStore(private val context: Context) {
     // Only a *running* job blocks a new one — a Failed entry must not, or the
     // error dialog's 重試 button would be a permanent no-op.
     if (_jobs.value[k] is JobState.Running || hasTranscript(record.id)) return
-    scope.launch { runTranscript(record) }
+    scope.launch { awaitTranscript(record) }
   }
 
   fun processHandout(record: EpisodeRecord) {
     val k = key(AiKind.HANDOUT, record.id)
     if (_jobs.value[k] is JobState.Running || hasHandout(record.id)) return
     scope.launch { runHandout(record) }
+  }
+
+  /** In-flight transcription per episode. Every path that needs a transcript —
+   *  the 逐字稿 button, a handout run, a double tap — goes through
+   *  [awaitTranscript] and joins the run already in flight instead of paying
+   *  OpenAI for a second transcription of the same audio. */
+  private val transcriptRuns = HashMap<String, Deferred<String?>>()
+
+  /** The saved transcript, or the result of the episode's (possibly already
+   *  running) transcription job. */
+  private suspend fun awaitTranscript(record: EpisodeRecord): String? {
+    transcriptText(record.id)?.let { return it }
+    return synchronized(transcriptRuns) {
+      transcriptRuns.getOrPut(record.id) {
+        scope.async { runTranscript(record) }.also { run ->
+          run.invokeOnCompletion {
+            synchronized(transcriptRuns) {
+              if (transcriptRuns[record.id] === run) transcriptRuns.remove(record.id)
+            }
+          }
+        }
+      }
+    }.await()
   }
 
   /** Generate (or regenerate, if the language changed) the translation for an
@@ -232,11 +258,13 @@ class AIContentStore(private val context: Context) {
 
   // MARK: Work
 
-  /** Transcribe + segment (idempotent). Returns the saved text, or null on failure. */
+  /** Transcribe + segment (idempotent). Returns the saved text, or null on failure.
+   *  Callers go through [awaitTranscript] so only one run exists per episode. */
   private suspend fun runTranscript(record: EpisodeRecord): String? {
     transcriptText(record.id)?.let { return it }
     val k = key(AiKind.TRANSCRIPT, record.id)
     val settings = NerLanApp.instance.settings
+    Log.i("AIContentStore", "transcription run started for ${record.id}")
     setJob(k, JobState.Running("處理音訊中…"))
     return try {
       val source = audioFile(record) ?: throw Exception("找不到音訊檔")
@@ -322,7 +350,7 @@ class AIContentStore(private val context: Context) {
     val settings = NerLanApp.instance.settings
     setJob(k, JobState.Running("準備逐字稿…"))
     try {
-      val transcript = runTranscript(record) ?: run {
+      val transcript = awaitTranscript(record) ?: run {
         val message = (_jobs.value[key(AiKind.TRANSCRIPT, record.id)] as? JobState.Failed)?.message
         throw Exception(message ?: "逐字稿失敗")
       }

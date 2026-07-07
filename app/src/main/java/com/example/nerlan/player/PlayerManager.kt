@@ -19,6 +19,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -98,6 +99,10 @@ object PlayerManager {
       c.repeatMode = _repeatMode.value
       c.addListener(object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+          // Snap position/duration on both edges: the poll below sleeps while
+          // paused, so this is what keeps the paused UI honest.
+          _positionMs.value = c.currentPosition.coerceAtLeast(0)
+          _durationMs.value = c.duration.takeIf { d -> d > 0 } ?: 0
           _isPlaying.value = isPlaying
           // Persist the tally and request a sync when playback stops.
           if (!isPlaying) NerLanApp.instance.stats.flush()
@@ -148,6 +153,15 @@ object PlayerManager {
       // wall-clock listening time, independent of playback rate.
       var lastTick = 0L
       while (true) {
+        // Nothing plays: neither the position nor the tally can change, so
+        // sleep until the controller listener flips isPlaying instead of
+        // waking the main thread twice a second for the process's lifetime.
+        // Seeks made while paused publish their position directly (seekTo/
+        // skip/onIsPlayingChanged), not through this loop.
+        if (!_isPlaying.value) {
+          lastTick = 0L
+          _isPlaying.first { it }
+        }
         controller?.let { c ->
           _positionMs.value = c.currentPosition.coerceAtLeast(0)
           _durationMs.value = c.duration.takeIf { d -> d > 0 } ?: 0
@@ -251,6 +265,12 @@ object PlayerManager {
           loopRemaining = null
           break
         }
+        // Paused mid-loop (user hit pause, audio focus lost): the position
+        // can't cross endMs, so don't spin at 40ms while nothing moves.
+        if (!ctrl.isPlaying) {
+          delay(250)
+          continue
+        }
         val pos = ctrl.currentPosition
         if (!triggered && pos >= endMs) {
           triggered = true
@@ -283,11 +303,17 @@ object PlayerManager {
     loopRemaining = null
   }
 
-  fun seekTo(ms: Long) { controller?.seekTo(ms) }
+  fun seekTo(ms: Long) {
+    val c = controller ?: return
+    c.seekTo(ms)
+    _positionMs.value = ms.coerceAtLeast(0)
+  }
 
   fun skip(deltaMs: Long) {
     val c = controller ?: return
-    c.seekTo((c.currentPosition + deltaMs).coerceAtLeast(0))
+    val target = (c.currentPosition + deltaMs).coerceAtLeast(0)
+    c.seekTo(target)
+    _positionMs.value = target
   }
 
   /** Cycle no-repeat -> repeat all -> repeat one. */

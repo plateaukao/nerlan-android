@@ -99,6 +99,12 @@ object PlayerManager {
             reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
             NerLanApp.instance.stats.noteCompleted(_current.value)
           }
+          // A sentence loop never carries across episodes. play()/next()/previous()
+          // already clear it, but transitions can also come from outside this
+          // facade (auto-advance, the media notification, a headset button) — and a
+          // stale loop would seek the *new* episode back into the old range.
+          // Repeat-one restarts the same item, so its loop stays valid.
+          if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) clearLoop()
           _current.value = mediaItem?.let(::recordOf)
           _hasNext.value = c.hasNextMediaItem()
           _hasPrevious.value = c.hasPreviousMediaItem()
@@ -213,10 +219,18 @@ object PlayerManager {
     _loopRegion.value = from..endMs
     c.seekTo(from)
     c.play()
+    val mediaId = c.currentMediaItem?.mediaId
     loopJob = scope.launch {
       var triggered = false
       while (true) {
         val ctrl = controller ?: break
+        // Belt to the transition listener's braces: if the playing item changed
+        // under us, stop looping rather than seek the wrong episode.
+        if (ctrl.currentMediaItem?.mediaId != mediaId) {
+          _loopRegion.value = null
+          loopRemaining = null
+          break
+        }
         val pos = ctrl.currentPosition
         if (!triggered && pos >= endMs) {
           triggered = true

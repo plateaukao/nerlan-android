@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -146,7 +147,12 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
     }
   }
 
-  val records = remember(episodes) { episodes.map { EpisodeRecord.from(it, program) } }
+  // One combined list drives the lazy items below. Indexing two separately
+  // derived lists inside the item lambda can crash: a measure-time subcomposition
+  // may run between the episodes write and recomposition (or after refresh()
+  // shrinks the list), and then count, keys and content disagree.
+  val rows = remember(episodes) { episodes.map { it to EpisodeRecord.from(it, program) } }
+  val records = remember(rows) { rows.map { it.second } }
 
   // The parent (MainScreen) Scaffold already insets below the status bar;
   // zero out this nested Scaffold's insets to avoid double top spacing.
@@ -237,8 +243,8 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
           )
         }
       }
-      items(episodes.size, key = { episodes[it].episodeId }) { i ->
-        EpisodeRow(episode = episodes[i], record = records[i], queue = records)
+      items(rows, key = { it.first.episodeId }) { (episode, record) ->
+        EpisodeRow(episode = episode, record = record, queue = records)
       }
       if (isLoading) {
         item {

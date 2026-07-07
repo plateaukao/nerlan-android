@@ -69,9 +69,17 @@ object PlayerManager {
 
   private var loopRemaining: Int? = null
   private var loopJob: Job? = null
+  /** Guards [initialize] re-entry. [controller] is only assigned once the async
+   *  connection completes, so checking it alone lets a second initialize (the
+   *  activity recreated during the connect window) build a duplicate controller
+   *  and a second stats loop — double-counting all listening time. Main-thread
+   *  only, like initialize itself. */
+  private var initializeStarted = false
+  private var statsPollJob: Job? = null
 
   fun initialize(context: Context) {
-    if (controller != null) return
+    if (initializeStarted) return
+    initializeStarted = true
     val prefs = context.getSharedPreferences("player", Context.MODE_PRIVATE)
     _playbackRate.value = prefs.getFloat("playbackRate", 1.0f)
     _repeatMode.value = prefs.getInt("repeatMode", Player.REPEAT_MODE_OFF)
@@ -79,7 +87,12 @@ object PlayerManager {
     val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
     val future = MediaController.Builder(context, token).buildAsync()
     future.addListener({
-      val c = future.get()
+      // A failed connection throws from get(); clear the guard so the next
+      // activity launch can try again instead of leaving the player dead.
+      val c = runCatching { future.get() }.getOrElse {
+        initializeStarted = false
+        return@addListener
+      }
       controller = c
       c.setPlaybackSpeed(_playbackRate.value)
       c.repeatMode = _repeatMode.value
@@ -126,7 +139,10 @@ object PlayerManager {
       _isPlaying.value = c.isPlaying
     }, MoreExecutors.directExecutor())
 
-    scope.launch {
+    // One poll loop per process, even if a failed connection makes initialize
+    // run again — a duplicate loop would double-count listening time.
+    if (statsPollJob != null) return
+    statsPollJob = scope.launch {
       // Credit real time spent in the playing state to the listening stats.
       // Gaps from pause/seek/backgrounding (delta >= 5s) are dropped, so this is
       // wall-clock listening time, independent of playback rate.

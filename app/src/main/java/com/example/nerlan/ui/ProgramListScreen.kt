@@ -4,6 +4,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -51,20 +55,28 @@ import com.example.nerlan.data.LanguageGroup
 import com.example.nerlan.data.PodcastFeed
 import com.example.nerlan.data.Program
 
+/** Chips lead with the most-studied languages so they stay on the visible
+ *  single line when the chip row is folded; the rest keep catalog order. */
+private val PRIORITY_LANGUAGES = listOf("英語", "日語", "韓語", "法語")
+
 /**
  * Browse language-learning programs, filterable by language.
  * The full catalog loads in one request; chips derive from loaded data
- * and filter instantly client-side. Chips wrap into rows (no carousel).
+ * and filter instantly client-side. The chip row folds to one scrollable
+ * line by default and expands into a wrap layout via the chevron.
  */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (PodcastFeed) -> Unit) {
   val catalog = com.example.nerlan.NerLanApp.instance.catalog
   val podcasts = com.example.nerlan.NerLanApp.instance.podcasts
+  val settings = com.example.nerlan.NerLanApp.instance.settings
   val feeds by podcasts.feeds.collectAsState()
   val scope = rememberCoroutineScope()
   var groups by remember { mutableStateOf<List<LanguageGroup>>(emptyList()) }
-  var selectedLanguage by remember { mutableStateOf<String?>(null) }
+  val storedLanguageFilter by settings.programLanguageFilter.collectAsState()
+  val selectedLanguage = storedLanguageFilter.ifEmpty { null }
+  var chipsExpanded by remember { mutableStateOf(false) }
   var isLoading by remember { mutableStateOf(true) }
   var isRefreshing by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -102,6 +114,19 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (Podcas
     }
   }
 
+  // Drop a restored filter that no longer matches any catalog language,
+  // which would otherwise leave the list permanently empty.
+  LaunchedEffect(groups) {
+    val stored = settings.programLanguageFilter.value
+    if (groups.isNotEmpty() && stored.isNotEmpty() && groups.none { it.language == stored }) {
+      settings.setProgramLanguageFilter("")
+    }
+  }
+
+  val languages = remember(groups) {
+    val all = groups.map { it.language }
+    PRIORITY_LANGUAGES.filter { it in all } + all.filterNot { it in PRIORITY_LANGUAGES }
+  }
   val visibleGroups = selectedLanguage?.let { sel -> groups.filter { it.language == sel } } ?: groups
 
   PullToRefreshBox(
@@ -144,16 +169,35 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (Podcas
           }
         }
         item {
-          FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-          ) {
-            LanguageChip("全部", selectedLanguage == null) { selectedLanguage = null }
-            groups.forEach { group ->
-              LanguageChip(group.language, selectedLanguage == group.language) {
-                selectedLanguage = group.language
+          val chipContent: @Composable () -> Unit = {
+            languages.forEach { lang ->
+              LanguageChip(lang, selectedLanguage == lang) {
+                settings.setProgramLanguageFilter(lang)
               }
+            }
+            LanguageChip("全部", selectedLanguage == null) { settings.setProgramLanguageFilter("") }
+          }
+          Row(
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+          ) {
+            if (chipsExpanded) {
+              FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f),
+              ) { chipContent() }
+            } else {
+              Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+              ) { chipContent() }
+            }
+            IconButton(onClick = { chipsExpanded = !chipsExpanded }) {
+              Icon(
+                if (chipsExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = if (chipsExpanded) "收合語言" else "展開語言",
+              )
             }
           }
         }

@@ -58,6 +58,12 @@ class SettingsStore(context: Context) {
   private val _transcriptTranslateMode = MutableStateFlow(prefs.getInt(KEY_TRANSLATE_MODE, 0))
   val transcriptTranslateMode: StateFlow<Int> = _transcriptTranslateMode
 
+  /** Last chosen language filter on the program list ("" = 全部), restored
+   *  across launches. */
+  private val _programLanguageFilter =
+    MutableStateFlow(prefs.getString(KEY_PROGRAM_LANG, "").orEmpty())
+  val programLanguageFilter: StateFlow<String> = _programLanguageFilter
+
   fun setApiKey(value: String) {
     _apiKey.value = value
     prefs.edit().putString(KEY_API, value).apply()
@@ -109,6 +115,11 @@ class SettingsStore(context: Context) {
     prefs.edit().putInt(KEY_TRANSLATE_MODE, value).apply()
   }
 
+  fun setProgramLanguageFilter(value: String) {
+    _programLanguageFilter.value = value
+    prefs.edit().putString(KEY_PROGRAM_LANG, value).apply()
+  }
+
   /** Model names coerced away from blank for actual API calls. */
   fun chatModelOrDefault() = _chatModel.value.ifBlank { DEFAULT_CHAT_MODEL }
   fun transcriptionModelOrDefault() = _transcriptionModel.value.ifBlank { DEFAULT_TRANSCRIPTION_MODEL }
@@ -143,5 +154,6 @@ class SettingsStore(context: Context) {
     private const val KEY_SCROLL_ANIM = "transcript_scroll_animated"
     private const val KEY_SHADOW_COUNT = "shadow_loop_count"
     private const val KEY_TRANSLATE_MODE = "transcript_translate_mode"
+    private const val KEY_PROGRAM_LANG = "program_language_filter"
   }
 }

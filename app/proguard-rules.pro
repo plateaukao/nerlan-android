@@ -54,3 +54,13 @@
 # is fixed. disableHorizontalClassMerging alone does NOT fix it.
 -keep class androidx.media3.** { *; }
 -dontwarn android.media.metrics.**
+
+# --- Glance widgets ----------------------------------------------------------
+# A widget button stores its ActionCallback by class name; the Glance runtime
+# instantiates it reflectively when the button is tapped. Glance's own consumer
+# rule keeps the classes from being removed or renamed — this pins the no-arg
+# constructor as well, without which a tap would silently do nothing in release
+# builds only.
+-keepclassmembers class * extends androidx.glance.appwidget.action.ActionCallback {
+    <init>();
+}

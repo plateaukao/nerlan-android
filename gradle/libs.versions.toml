@@ -16,6 +16,7 @@ lifecycleViewmodelNav3 = "2.10.0"
 media3 = "1.9.0"
 okhttp = "4.12.0"
 coil = "2.7.0"
+glance = "1.1.1"
 kotlinxSerializationJson = "1.9.0"
 playServicesAuth = "21.3.0"
 appauth = "0.11.1"
@@ -50,6 +51,8 @@ androidx-media3-transformer = { module = "androidx.media3:media3-transformer", v
 androidx-media3-datasource = { module = "androidx.media3:media3-datasource", version.ref = "media3" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
+androidx-glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glance" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 appauth = { module = "net.openid:appauth", version.ref = "appauth" }

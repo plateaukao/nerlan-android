@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">NerLan</string>
+
+    <!-- Home-screen widgets (labels and descriptions shown in the widget picker). -->
+    <string name="widget_up_next_label">繼續收聽</string>
+    <string name="widget_up_next_description">顯示正在播放的單集，並直接播放接下來的內容。</string>
+    <string name="widget_recent_shows_label">最近播放</string>
+    <string name="widget_recent_shows_description">從上次停下的地方繼續，整個節目接著播。</string>
+    <string name="widget_shows_label">我的節目</string>
+    <string name="widget_shows_description">收藏的節目與訂閱的 Podcast，一按就打開。可自選要顯示哪幾個。</string>
+    <string name="widget_stats_label">學習紀錄</string>
+    <string name="widget_stats_description">今天聽了多久、連續學習幾天。</string>
 </resources>

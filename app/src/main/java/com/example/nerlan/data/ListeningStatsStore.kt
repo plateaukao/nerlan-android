@@ -226,6 +226,18 @@ class ListeningStatsStore(context: Context) {
 
   // MARK: - Merged view (this device + peers)
 
+  /**
+   * programId -> total seconds listened, merged across devices. Ranks the
+   * widgets' show grid — podcast records use their feed URL as programId, so one
+   * map covers programs and podcasts alike.
+   */
+  fun secondsByProgram(): Map<String, Double> = synchronized(lock) {
+    val secs = HashMap<String, Double>()
+    for ((id, v) in programSeconds) secs[id] = (secs[id] ?: 0.0) + v
+    for (p in peers) for ((id, v) in p.programSeconds) secs[id] = (secs[id] ?: 0.0) + v
+    secs
+  }
+
   /** Compute the whole usage view in one locked pass. */
   fun uiStats(): UiStats = synchronized(lock) {
     val merged = mergedDailyLocked()

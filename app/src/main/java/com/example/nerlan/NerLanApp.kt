@@ -13,8 +13,11 @@ import com.example.nerlan.data.DownloadManager
 import com.example.nerlan.data.DriveSync
 import com.example.nerlan.data.FavoritesStore
 import com.example.nerlan.data.ListeningStatsStore
+import com.example.nerlan.data.PlaybackPositionStore
 import com.example.nerlan.data.PodcastStore
+import com.example.nerlan.data.RecentShowsStore
 import com.example.nerlan.data.SettingsStore
+import com.example.nerlan.widget.WidgetRefresher
 
 class NerLanApp : Application(), ImageLoaderFactory {
   lateinit var favorites: FavoritesStore
@@ -33,6 +36,10 @@ class NerLanApp : Application(), ImageLoaderFactory {
     private set
   lateinit var podcasts: PodcastStore
     private set
+  lateinit var positions: PlaybackPositionStore
+    private set
+  lateinit var recents: RecentShowsStore
+    private set
 
   override fun onCreate() {
     super.onCreate()
@@ -40,11 +47,15 @@ class NerLanApp : Application(), ImageLoaderFactory {
     favorites = FavoritesStore(filesDir)
     downloads = DownloadManager(filesDir)
     podcasts = PodcastStore(filesDir)
+    positions = PlaybackPositionStore(filesDir)
+    recents = RecentShowsStore(filesDir)
     settings = SettingsStore(this)
     ai = AIContentStore(this)
     stats = ListeningStatsStore(this)
     drive = DriveSync(this)
     catalog = CatalogCache(cacheDir)
+    // Keep the home-screen widgets in step with playback and the library.
+    WidgetRefresher.start(this)
     // Pull/push on launch when sync is on (no-op if not signed in).
     if (settings.syncToDrive.value) drive.syncNow()
     // Flush changes when the app goes to the background (ProcessLifecycleOwner's

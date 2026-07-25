@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 
 /**
@@ -104,8 +106,12 @@ object PlayerManager {
           _positionMs.value = c.currentPosition.coerceAtLeast(0)
           _durationMs.value = c.duration.takeIf { d -> d > 0 } ?: 0
           _isPlaying.value = isPlaying
-          // Persist the tally and request a sync when playback stops.
-          if (!isPlaying) NerLanApp.instance.stats.flush()
+          // Persist the tally and request a sync when playback stops. Pausing is
+          // also the moment worth pinning an accurate resume point.
+          if (!isPlaying) {
+            savePosition()
+            NerLanApp.instance.stats.flush()
+          }
         }
         override fun onRepeatModeChanged(repeatMode: Int) {
           _repeatMode.value = repeatMode
@@ -116,6 +122,9 @@ object PlayerManager {
           if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
             reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
             NerLanApp.instance.stats.noteCompleted(_current.value)
+            // Played to the end: drop its resume point so a replay starts at the
+            // top. _current is still the outgoing episode here.
+            _current.value?.let { NerLanApp.instance.positions.clear(it.id) }
           }
           // A sentence loop never carries across episodes. play()/next()/previous()
           // already clear it, but transitions can also come from outside this
@@ -123,7 +132,17 @@ object PlayerManager {
           // stale loop would seek the *new* episode back into the old range.
           // Repeat-one restarts the same item, so its loop stays valid.
           if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) clearLoop()
-          _current.value = mediaItem?.let(::recordOf)
+          val record = mediaItem?.let(::recordOf)
+          _current.value = record
+          if (record != null) {
+            NerLanApp.instance.recents.note(record)
+            // Auto-advance lands at 0; if the listener had already started this
+            // episode, pick up where they stopped (play() seeds its own start
+            // position, and repeat-one deliberately restarts).
+            if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+              NerLanApp.instance.positions.positionMs(record.id)?.let(c::seekTo)
+            }
+          }
           _hasNext.value = c.hasNextMediaItem()
           _hasPrevious.value = c.hasPreviousMediaItem()
         }
@@ -132,6 +151,7 @@ object PlayerManager {
           // final episode's completion and flush the listening tally.
           if (playbackState == Player.STATE_ENDED) {
             NerLanApp.instance.stats.noteCompleted(_current.value)
+            _current.value?.let { NerLanApp.instance.positions.clear(it.id) }
           }
         }
         override fun onEvents(player: Player, events: Player.Events) {
@@ -152,6 +172,7 @@ object PlayerManager {
       // Gaps from pause/seek/backgrounding (delta >= 5s) are dropped, so this is
       // wall-clock listening time, independent of playback rate.
       var lastTick = 0L
+      var lastPositionSave = 0L
       while (true) {
         // Nothing plays: neither the position nor the tally can change, so
         // sleep until the controller listener flips isPlaying instead of
@@ -172,6 +193,12 @@ object PlayerManager {
               if (delta in 0.0..5.0) NerLanApp.instance.stats.addListening(delta, _current.value)
             }
             lastTick = now
+            // Persist the resume point every few seconds rather than on every
+            // 500ms tick — the file only needs to be roughly right.
+            if (now - lastPositionSave >= 5_000) {
+              lastPositionSave = now
+              savePosition()
+            }
           } else {
             lastTick = 0L
           }
@@ -215,15 +242,85 @@ object PlayerManager {
     // playable — starting anyway would play whatever sits at index 0, and an
     // empty queue would hit STATE_ENDED and log a bogus completion.
     if (index < 0) return
-    c.setMediaItems(playable.map(::mediaItemOf), index, 0)
+    // Start where this episode was left off, if anywhere worth resuming.
+    val startMs = NerLanApp.instance.positions.positionMs(record.id) ?: 0L
+    c.setMediaItems(playable.map(::mediaItemOf), index, startMs)
     c.prepare()
     c.play()
     _current.value = record
+    NerLanApp.instance.recents.note(record)
   }
 
   fun togglePlayPause() {
     val c = controller ?: return
     if (c.isPlaying) c.pause() else c.play()
+  }
+
+  /** Persist where the current episode is, so reopening it resumes. The store
+   *  drops positions at either edge, so this can be called freely. */
+  private fun savePosition() {
+    val c = controller ?: return
+    val id = _current.value?.id ?: return
+    NerLanApp.instance.positions.record(id, c.currentPosition.coerceAtLeast(0), c.duration)
+  }
+
+  /**
+   * Connect if needed and wait for the MediaController. Home-screen widgets can
+   * run in a freshly-started process where nothing ever called [initialize] (the
+   * activity may never have launched), so both their rendering and their buttons
+   * have to be able to bring the controller up themselves.
+   */
+  suspend fun awaitController(context: Context, timeoutMs: Long = 3_000): MediaController? {
+    withContext(Dispatchers.Main) { initialize(context.applicationContext) }
+    return withTimeoutOrNull(timeoutMs) {
+      while (controller == null) delay(50)
+      controller
+    }
+  }
+
+  /**
+   * Play a whole show as a playlist, resuming at the episode it was last left on
+   * — the 最近播放 widget's button. Episodes come from the podcast feed, or from
+   * the browse cache for a NER program: that cache pages ascending from episode
+   * 1, which is exactly the course order wanted here.
+   */
+  suspend fun playShow(context: Context, showId: String, isPodcast: Boolean) {
+    val app = NerLanApp.instance
+    val episodes: List<EpisodeRecord> = if (isPodcast) {
+      app.podcasts.feed(showId)?.episodes.orEmpty()
+    } else {
+      val program = app.favorites.programs.value.firstOrNull { it.programId == showId }
+        ?: app.catalog.loadPrograms()?.firstOrNull { it.programId == showId }
+      program?.let { p ->
+        app.catalog.loadEpisodes(showId)?.episodes?.map { EpisodeRecord.from(it, p) }
+      }.orEmpty()
+    }
+    if (episodes.isEmpty()) return
+    val resumeId = app.recents.entry(showId)?.lastEpisodeId
+    val start = episodes.firstOrNull { it.id == resumeId } ?: episodes.first()
+    awaitController(context) ?: return
+    withContext(Dispatchers.Main) {
+      if (_current.value?.id == start.id) togglePlayPause() else play(start, episodes)
+    }
+  }
+
+  /** Play one episode by id, resolved from everything held locally — the widgets'
+   *  per-episode play buttons. */
+  suspend fun playEpisode(context: Context, episodeId: String) {
+    val app = NerLanApp.instance
+    val hit = sequenceOf(
+      app.downloads.records.value,
+      app.favorites.episodes.value,
+    ).mapNotNull { list -> list.firstOrNull { it.id == episodeId }?.let { it to list } }
+      .firstOrNull()
+      ?: app.podcasts.feeds.value.firstNotNullOfOrNull { feed ->
+        feed.episodes.firstOrNull { it.id == episodeId }?.let { it to feed.episodes }
+      }
+      ?: return
+    awaitController(context) ?: return
+    withContext(Dispatchers.Main) {
+      if (_current.value?.id == episodeId) togglePlayPause() else play(hit.first, hit.second)
+    }
   }
 
   fun next() { clearLoop(); controller?.seekToNextMediaItem() }

@@ -104,6 +104,10 @@ dependencies {
   // Audio transcode (shrink episodes for OpenAI's 25 MB upload cap)
   implementation(libs.androidx.media3.transformer)
 
+  // Home-screen widgets (Glance = Compose for RemoteViews)
+  implementation(libs.androidx.glance.appwidget)
+  implementation(libs.androidx.glance.material3)
+
   // Networking / JSON / images
   implementation(libs.okhttp)
   implementation(libs.kotlinx.serialization.json)

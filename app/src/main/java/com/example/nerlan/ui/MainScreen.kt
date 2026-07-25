@@ -48,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import com.example.nerlan.NerLanApp
 import com.example.nerlan.data.PodcastFeed
 import com.example.nerlan.data.Program
 import com.example.nerlan.player.PlayerManager
@@ -69,6 +70,31 @@ fun MainScreen() {
   var leftCollapsed by remember { mutableStateOf(false) }
   val current by PlayerManager.current.collectAsState()
   val panel = remember { StudyPanelController() }
+
+  // Home-screen widget taps arrive as one-shot requests; consume and clear them.
+  val requestedTab by DeepLinkRouter.tab.collectAsState()
+  val pendingShow by DeepLinkRouter.pendingShow.collectAsState()
+  val openPlayerSignal by DeepLinkRouter.openPlayer.collectAsState()
+
+  LaunchedEffect(requestedTab) {
+    requestedTab?.let { tab = it; DeepLinkRouter.consumeTab() }
+  }
+  LaunchedEffect(openPlayerSignal) {
+    if (openPlayerSignal > 0 && PlayerManager.current.value != null) showPlayerSheet = true
+  }
+  LaunchedEffect(pendingShow) {
+    val (id, isPodcast) = pendingShow ?: return@LaunchedEffect
+    val app = NerLanApp.instance
+    if (isPodcast) {
+      app.podcasts.feed(id)?.let { podcastDetail = it; DeepLinkRouter.consumeShow() }
+    } else {
+      // Favorited programs are to hand; anything else comes from the browse
+      // cache — the same place the widget drew the show from.
+      val program = app.favorites.programs.value.firstOrNull { it.programId == id }
+        ?: app.catalog.loadPrograms()?.firstOrNull { it.programId == id }
+      program?.let { programsDetail = it; DeepLinkRouter.consumeShow() }
+    }
+  }
 
   val browser = @Composable {
     Scaffold(

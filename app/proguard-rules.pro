@@ -55,6 +55,35 @@
 -keep class androidx.media3.** { *; }
 -dontwarn android.media.metrics.**
 
+# --- Glance -> WorkManager -> Room -------------------------------------------
+# Glance drags in work-runtime 2.7.1, which drags in room-runtime 2.2.5 — a Room
+# old enough to ship no R8-full-mode consumer rules. Room loads its generated
+# WorkDatabase_Impl *by name* and calls newInstance(), so as soon as R8 renames
+# that class or drops its no-arg constructor, WorkManager's startup initializer
+# throws "Failed to create an instance of androidx.work.impl.WorkDatabase" from
+# androidx.startup.InitializationProvider — the app dies before Application
+# .onCreate, in release builds only (found on the Android 10 phone; the debug
+# build and the emulator were both fine). WorkManager instantiates its Workers
+# by name for the same reason.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class * extends androidx.work.ListenableWorker { <init>(...); }
+-keep class androidx.work.impl.** { *; }
+
+# --- Glance -> WorkManager -> Room -------------------------------------------
+# Glance drags in work-runtime 2.7.1, which drags in room-runtime 2.2.5 — a Room
+# old enough to ship no R8-full-mode consumer rules. Room loads its generated
+# WorkDatabase_Impl *by name* and calls newInstance(), so as soon as R8 renames
+# that class or drops its no-arg constructor, WorkManager's startup initializer
+# throws "Failed to create an instance of androidx.work.impl.WorkDatabase" from
+# androidx.startup.InitializationProvider — killing the app before
+# Application.onCreate, in release builds only. Reproduced identically on
+# Android 10 and Android 16, so it is R8, not a device quirk; debug builds and
+# the emulator were both fine, which is exactly why it slipped through.
+# WorkManager instantiates its Workers by name for the same reason.
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class * extends androidx.work.ListenableWorker { <init>(...); }
+-keep class androidx.work.impl.** { *; }
+
 # --- Glance widgets ----------------------------------------------------------
 # A widget button stores its ActionCallback by class name; the Glance runtime
 # instantiates it reflectively when the button is tapped. Glance's own consumer

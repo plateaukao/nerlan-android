@@ -17,6 +17,7 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 
 /**
@@ -48,28 +49,34 @@ class ShowsWidget : GlanceAppWidget() {
     provideContent {
       GlanceTheme {
         WidgetSurface {
-          // Derive the grid from the widget's real size. Fixed breakpoints
-          // never matched a square 2x2 widget — it fell through to the
-          // narrowest layout and rendered one row above a lot of dead space.
+          // The grid fills the widget: counts come from the real size, then the
+          // cover is sized to the resulting cell. Sizing covers to a fixed 56dp
+          // and stacking however many fit left nearly half the widget empty at
+          // anything but the smallest size.
           val size = LocalSize.current
           val usableW = size.width - PADDING * 2
-          val usableH = size.height - PADDING * 2
           val showNames = size.width >= 220.dp
-          val rowPitch = COVER + (if (showNames) NAME_H else 0.dp) + GAP
-          val columns = ((usableW + GAP) / (COVER + GAP)).toInt().coerceIn(2, 4)
-          val headerH = if (showNames) HEADER_H else 0.dp
-          val rows = ((usableH - headerH + GAP) / rowPitch).toInt().coerceIn(1, 3)
+          val gridH = size.height - PADDING * 2 - (if (showNames) HEADER_H else 0.dp)
+
+          val columns = ((usableW + GAP) / (MIN_CELL + GAP)).toInt().coerceIn(2, 4)
+          val rows = ((gridH + GAP) / (MIN_CELL + GAP)).toInt().coerceIn(1, 4)
+          val cellW = (usableW - GAP * (columns - 1)) / columns
+          val cellH = (gridH - GAP * (rows - 1)) / rows
+          // Keep covers square: the smaller of the two cell dimensions wins.
+          val cover = minOf(cellW, cellH - (if (showNames) NAME_H else 0.dp))
           val visible = shows.take(columns * rows)
 
           if (visible.isEmpty()) {
             WidgetEmptyState("點選節目旁的愛心\n就會出現在這裡", openTabAction("programs"))
           } else {
-            Column(modifier = GlanceModifier.fillMaxWidth()) {
+            Column(modifier = GlanceModifier.fillMaxSize()) {
               if (showNames) WidgetHeader("我的節目")
               visible.chunked(columns).forEach { rowShows ->
+                // defaultWeight spreads the rows down the whole widget, so
+                // there is no leftover strip at the bottom.
                 Row(
-                  modifier = GlanceModifier.fillMaxWidth(),
-                  verticalAlignment = Alignment.Top,
+                  modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
+                  verticalAlignment = Alignment.CenterVertically,
                 ) {
                   rowShows.forEach { show ->
                     Column(
@@ -78,8 +85,8 @@ class ShowsWidget : GlanceAppWidget() {
                     ) {
                       WidgetCover(
                         covers.cover(show.coverUrl),
-                        sizeDp = COVER.value.toInt(),
-                        corner = 10,
+                        sizeDp = cover.value.toInt().coerceAtLeast(40),
+                        corner = 12,
                         onClick = openShowAction(show.id, show.isPodcast),
                       )
                       if (showNames) {
@@ -93,7 +100,6 @@ class ShowsWidget : GlanceAppWidget() {
                     Column(modifier = GlanceModifier.defaultWeight()) {}
                   }
                 }
-                ColSpacer(8)
               }
             }
           }
@@ -106,9 +112,11 @@ class ShowsWidget : GlanceAppWidget() {
     /** Newline-joined show ids pinned for one widget instance. */
     val PICKED_SHOWS = stringPreferencesKey("pickedShows")
 
-    /** Grid metrics; `WidgetSurface` applies PADDING on every side. */
+    /** Grid metrics; `WidgetSurface` applies PADDING on every side.
+     *  MIN_CELL is the smallest cell worth splitting into — it decides how many
+     *  rows/columns a given widget size gets, not how big the covers end up. */
     private val PADDING = 12.dp
-    private val COVER = 56.dp
+    private val MIN_CELL = 64.dp
     private val GAP = 10.dp
     private val NAME_H = 16.dp
     private val HEADER_H = 24.dp

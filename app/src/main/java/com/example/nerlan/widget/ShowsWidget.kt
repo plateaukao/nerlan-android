@@ -30,7 +30,7 @@ import androidx.glance.layout.fillMaxWidth
  * pinned to different shows.
  */
 class ShowsWidget : GlanceAppWidget() {
-  override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, TALL))
+  override val sizeMode = SizeMode.Exact
 
   override suspend fun provideGlance(context: Context, id: GlanceId) {
     val model = WidgetModelBuilder.build(context)
@@ -43,21 +43,29 @@ class ShowsWidget : GlanceAppWidget() {
     val byId = (model.shows + model.recents).associateBy { it.id }
     val shows = if (picked.isEmpty()) model.shows else picked.mapNotNull { byId[it] }
 
-    val covers = loadCovers(context, shows.take(8).map { it.coverUrl }, 128)
+    val covers = loadCovers(context, shows.take(12).map { it.coverUrl }, 128)
 
     provideContent {
       GlanceTheme {
         WidgetSurface {
+          // Derive the grid from the widget's real size. Fixed breakpoints
+          // never matched a square 2x2 widget — it fell through to the
+          // narrowest layout and rendered one row above a lot of dead space.
           val size = LocalSize.current
-          val columns = if (size.width >= WIDE.width) 4 else 2
-          val rows = if (size.height >= TALL.height) 2 else 1
+          val usableW = size.width - PADDING * 2
+          val usableH = size.height - PADDING * 2
+          val showNames = size.width >= 220.dp
+          val rowPitch = COVER + (if (showNames) NAME_H else 0.dp) + GAP
+          val columns = ((usableW + GAP) / (COVER + GAP)).toInt().coerceIn(2, 4)
+          val headerH = if (showNames) HEADER_H else 0.dp
+          val rows = ((usableH - headerH + GAP) / rowPitch).toInt().coerceIn(1, 3)
           val visible = shows.take(columns * rows)
 
           if (visible.isEmpty()) {
             WidgetEmptyState("點選節目旁的愛心\n就會出現在這裡", openTabAction("programs"))
           } else {
             Column(modifier = GlanceModifier.fillMaxWidth()) {
-              if (size.width >= WIDE.width) WidgetHeader("我的節目")
+              if (showNames) WidgetHeader("我的節目")
               visible.chunked(columns).forEach { rowShows ->
                 Row(
                   modifier = GlanceModifier.fillMaxWidth(),
@@ -70,11 +78,11 @@ class ShowsWidget : GlanceAppWidget() {
                     ) {
                       WidgetCover(
                         covers.cover(show.coverUrl),
-                        sizeDp = 56,
+                        sizeDp = COVER.value.toInt(),
                         corner = 10,
                         onClick = openShowAction(show.id, show.isPodcast),
                       )
-                      if (size.width >= WIDE.width) {
+                      if (showNames) {
                         ColSpacer(3)
                         WidgetCaption(show.name)
                       }
@@ -98,9 +106,12 @@ class ShowsWidget : GlanceAppWidget() {
     /** Newline-joined show ids pinned for one widget instance. */
     val PICKED_SHOWS = stringPreferencesKey("pickedShows")
 
-    val SMALL = DpSize(140.dp, 120.dp)
-    val WIDE = DpSize(250.dp, 120.dp)
-    val TALL = DpSize(250.dp, 220.dp)
+    /** Grid metrics; `WidgetSurface` applies PADDING on every side. */
+    private val PADDING = 12.dp
+    private val COVER = 56.dp
+    private val GAP = 10.dp
+    private val NAME_H = 16.dp
+    private val HEADER_H = 24.dp
   }
 }
 

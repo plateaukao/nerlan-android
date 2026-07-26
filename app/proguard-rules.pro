@@ -66,8 +66,7 @@
 # build and the emulator were both fine). WorkManager instantiates its Workers
 # by name for the same reason.
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
--keep class * extends androidx.work.ListenableWorker { <init>(...); }
--keep class androidx.work.impl.** { *; }
+-keep class androidx.work.** { *; }
 
 # --- Glance -> WorkManager -> Room -------------------------------------------
 # Glance drags in work-runtime 2.7.1, which drags in room-runtime 2.2.5 — a Room
@@ -79,10 +78,18 @@
 # Application.onCreate, in release builds only. Reproduced identically on
 # Android 10 and Android 16, so it is R8, not a device quirk; debug builds and
 # the emulator were both fine, which is exactly why it slipped through.
-# WorkManager instantiates its Workers by name for the same reason.
+#
+# WorkManager reflects on more than the database, and each miss fails silently
+# in a different way. It also instantiates Workers *and* InputMergers by name:
+# with only the class kept, R8 drops the unused no-arg constructor and
+# WorkerWrapper dies with "Could not create Input Merger
+# androidx.work.OverwritingInputMerger" — before any worker body runs. Glance
+# composes every widget inside a WorkManager SessionWorker, so the visible
+# symptom was widgets stuck forever on Glance's loading spinner while the app
+# itself looked perfectly healthy. Keeping the whole (small) library is the
+# only rule that doesn't leave another reflective corner exposed.
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
--keep class * extends androidx.work.ListenableWorker { <init>(...); }
--keep class androidx.work.impl.** { *; }
+-keep class androidx.work.** { *; }
 
 # --- Glance widgets ----------------------------------------------------------
 # A widget button stores its ActionCallback by class name; the Glance runtime

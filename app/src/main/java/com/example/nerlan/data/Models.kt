@@ -154,6 +154,11 @@ data class EpisodeRecord(
   // unknown. null for NER programs, which are bilingual (Mandarin host + foreign
   // examples) and must not be forced. Presence (non-null) marks a podcast.
   val audioLocale: String? = null,
+  // Course sequence number, so the Downloads/AI lists sort in lesson order
+  // (bulk-published courses share a release date, which makes date order
+  // meaningless). Null for podcasts and for records persisted before it existed —
+  // EpisodeNumberBackfill fills the latter in.
+  val episodeNo: Int? = null,
 ) {
   /** PDF attachments, the only kind we can render inline. */
   val pdfAttachments: List<Attachment> get() = attachments.orEmpty().filter { it.isPdf }
@@ -184,7 +189,26 @@ data class EpisodeRecord(
       attachments = episode.attachments,
       durationSeconds = episode.duration,
       audioExt = null,   // NER audio is mp3
+      episodeNo = episode.episodeNumber,
     )
+  }
+}
+
+/**
+ * Course order for the Downloads/AI lists: episode number first when both sides
+ * have one (bulk-published courses share a release date, so date order
+ * degenerates to download/generation order), falling back to release date —
+ * right for podcasts and for records saved before [EpisodeRecord.episodeNo]
+ * existed — then title so equal keys stay deterministic.
+ */
+val episodeOrder = Comparator<EpisodeRecord> { a, b ->
+  val x = a.episodeNo
+  val y = b.episodeNo
+  if (x != null && y != null && x != y) {
+    x.compareTo(y)
+  } else {
+    val byDate = (a.playDate ?: "").compareTo(b.playDate ?: "")
+    if (byDate != 0) byDate else a.title.compareTo(b.title)
   }
 }
 

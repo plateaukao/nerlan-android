@@ -354,6 +354,7 @@ fun SettingsScreen(onDismiss: () -> Unit) {
       confirmButton = {
         TextButton(onClick = {
           AudioCache.clear(NerLanApp.instance)
+          NerLanApp.instance.downloads.clearCachedRecords()
           cacheBytes = 0
           showClearCacheConfirm = false
         }) { Text("清除") }

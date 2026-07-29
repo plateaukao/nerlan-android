@@ -39,6 +39,14 @@ class FavoritesStore(filesDir: File) {
     NerLanApp.instance.drive.requestSync()
   }
 
+  /** Backfill [EpisodeRecord.episodeNo] on favorites saved before the field
+   *  existed (see [EpisodeNumberBackfill]). */
+  fun applyEpisodeNumbers(numbers: Map<String, Int>) {
+    val updated = fillEpisodeNumbers(numbers, _episodes.value) ?: return
+    _episodes.value = updated
+    episodesFile.writeText(json.encodeToString(updated))
+  }
+
   // Programs
 
   fun isFavoriteProgram(programId: String) = _programs.value.any { it.programId == programId }

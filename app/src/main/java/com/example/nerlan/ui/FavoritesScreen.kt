@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.outlined.CheckCircle as CheckCircleOutline
 import androidx.compose.material.icons.outlined.Info as InfoOutline
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
@@ -100,6 +101,11 @@ fun SectionHeader(title: String) {
   )
 }
 
+/** How a Downloads-list row got its local audio, shown as a trailing badge:
+ *  a real (user-initiated) download, or a capture from the streamed-audio
+ *  cache. The fill, not the tint, carries the distinction on e-ink. */
+enum class DownloadBadge { DOWNLOADED, CACHED }
+
 /**
  * Shared row for favorites / downloads / AI lists: tap to play, optional trash.
  * In [aiReadyOnly] mode (the AI tab) the transcript/handout buttons appear only
@@ -123,6 +129,9 @@ fun RecordRow(
   subtitleOverride: String? = null,
   // Podcast episode list turns AI icons off, matching the NER episode list.
   showAI: Boolean = true,
+  // Set only in the Downloads tab: marks the row as a real download (filled
+  // check) or a streamed-cache capture (outlined, dimmed).
+  downloadBadge: DownloadBadge? = null,
 ) {
   val current by PlayerManager.current.collectAsState()
   val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
@@ -176,6 +185,16 @@ fun RecordRow(
         AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
         AiActionButton(AiKind.HANDOUT, record, compact = true)
       }
+    }
+    if (downloadBadge != null) {
+      val downloaded = downloadBadge == DownloadBadge.DOWNLOADED
+      Icon(
+        if (downloaded) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircleOutline,
+        contentDescription = if (downloaded) "已下載" else "快取",
+        tint = if (downloaded) MaterialTheme.colorScheme.primary
+               else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 8.dp).size(20.dp),
+      )
     }
    }
   }

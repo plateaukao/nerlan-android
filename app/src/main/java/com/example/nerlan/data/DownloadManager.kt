@@ -1,5 +1,7 @@
 package com.example.nerlan.data
 
+import com.example.nerlan.NerLanApp
+import com.example.nerlan.player.AudioCache
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
@@ -23,6 +25,7 @@ import okhttp3.Request
  */
 class DownloadManager(filesDir: File) {
   private val recordsFile = File(filesDir, "downloads.json")
+  private val cachedRecordsFile = File(filesDir, "cached.json")
   private val audioDir = File(filesDir, "audio").apply { mkdirs() }
   private val attachmentsDir = File(filesDir, "attachments").apply { mkdirs() }
   private val json = Json { ignoreUnknownKeys = true }
@@ -45,6 +48,17 @@ class DownloadManager(filesDir: File) {
   )
   val records: StateFlow<List<EpisodeRecord>> = _records
 
+  /** Records for episodes fully captured by the streamed-audio cache
+   *  (player.AudioCache), so the Downloads tab can list them (dimmed) alongside
+   *  explicit downloads. The metadata lives in filesDir (`cached.json`) but the
+   *  bytes stay in the purgeable LRU cache, so [pruneCachedRecords] drops
+   *  entries whose audio no longer survives there. */
+  private val _cachedRecords = MutableStateFlow(
+    runCatching { json.decodeFromString<List<EpisodeRecord>>(cachedRecordsFile.readText()) }
+      .getOrNull() ?: emptyList()
+  )
+  val cachedRecords: StateFlow<List<EpisodeRecord>> = _cachedRecords
+
   /** Serializes downloads.json writes: up to 3 download coroutines finish
    *  concurrently (plus deletes from the main thread), and two interleaved
    *  writeText calls can corrupt the file. The value is re-read inside the
@@ -57,6 +71,53 @@ class DownloadManager(filesDir: File) {
         runCatching { recordsFile.writeText(json.encodeToString(_records.value)) }
       }
     }
+  }
+
+  private fun persistCachedRecords() {
+    scope.launch {
+      recordsWriteMutex.withLock {
+        runCatching { cachedRecordsFile.writeText(json.encodeToString(_cachedRecords.value)) }
+      }
+    }
+  }
+
+  // MARK: Streamed-audio cache records
+
+  /** Register the record for a cache-captured episode so the Downloads tab can
+   *  list it. Called by the player when a stream finishes fully cached, and when
+   *  an episode loads already-cached — which backfills captures from before
+   *  records were kept. */
+  fun noteCachedEpisode(record: EpisodeRecord) {
+    if (isDownloaded(record.id)) return
+    if (_cachedRecords.value.any { it.id == record.id }) return
+    _cachedRecords.update { it + record }
+    persistCachedRecords()
+  }
+
+  /** Drop cached records that became explicit downloads or whose bytes the LRU
+   *  cache no longer fully holds. Called at launch with an AudioCache-backed
+   *  [fullyCached] check (opens the cache index — run on IO). */
+  fun pruneCachedRecords(fullyCached: (EpisodeRecord) -> Boolean) {
+    val keep = _cachedRecords.value.filter { !isDownloaded(it.id) && fullyCached(it) }
+    if (keep.size != _cachedRecords.value.size) {
+      _cachedRecords.value = keep
+      persistCachedRecords()
+    }
+  }
+
+  /** Forget every cache capture; rides along with "clear cached audio". */
+  fun clearCachedRecords() {
+    if (_cachedRecords.value.isEmpty()) return
+    _cachedRecords.value = emptyList()
+    persistCachedRecords()
+  }
+
+  private fun removeCachedRecord(episodeId: String) {
+    val cached = _cachedRecords.value.firstOrNull { it.id == episodeId } ?: return
+    _cachedRecords.update { rs -> rs.filterNot { it.id == episodeId } }
+    persistCachedRecords()
+    // Evict the bytes too (span deletes are file IO, so off the caller's thread).
+    scope.launch { AudioCache.removeResource(NerLanApp.instance, cached.audio) }
   }
 
   /** episodeId -> 0f..1f while a download is in flight */
@@ -146,6 +207,8 @@ class DownloadManager(filesDir: File) {
           downloadedFiles[record.id] = dest
           _records.update { rs -> if (rs.any { it.id == record.id }) rs else rs + record }
           persistRecords()
+          // An explicit download supersedes any streamed-cache capture.
+          removeCachedRecord(record.id)
         } catch (_: Exception) {
           tmp.delete()
         } finally {
@@ -191,6 +254,8 @@ class DownloadManager(filesDir: File) {
 
   fun attachmentCount(): Int = attachmentsDir.listFiles()?.count { it.isFile } ?: 0
 
+  /** Remove an episode's local audio — the explicit download and/or the
+   *  streamed-cache capture, whichever exist (the Downloads list mixes both). */
   fun delete(episodeId: String) {
     downloadedFiles.remove(episodeId)?.delete()
     _records.value.firstOrNull { it.id == episodeId }?.attachments.orEmpty().forEach {
@@ -198,5 +263,16 @@ class DownloadManager(filesDir: File) {
     }
     _records.update { rs -> rs.filterNot { it.id == episodeId } }
     persistRecords()
+    removeCachedRecord(episodeId)
+  }
+
+  /** Backfill [EpisodeRecord.episodeNo] on records saved before the field
+   *  existed (see [EpisodeNumberBackfill]). */
+  fun applyEpisodeNumbers(numbers: Map<String, Int>) {
+    fillEpisodeNumbers(numbers, _records.value)?.let { _records.value = it; persistRecords() }
+    fillEpisodeNumbers(numbers, _cachedRecords.value)?.let {
+      _cachedRecords.value = it
+      persistCachedRecords()
+    }
   }
 }

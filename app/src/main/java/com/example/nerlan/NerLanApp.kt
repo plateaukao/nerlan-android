@@ -16,8 +16,13 @@ import com.example.nerlan.data.ListeningStatsStore
 import com.example.nerlan.data.PlaybackPositionStore
 import com.example.nerlan.data.PodcastStore
 import com.example.nerlan.data.RecentShowsStore
+import com.example.nerlan.data.EpisodeNumberBackfill
 import com.example.nerlan.data.SettingsStore
+import com.example.nerlan.player.AudioCache
 import com.example.nerlan.widget.WidgetRefresher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class NerLanApp : Application(), ImageLoaderFactory {
   lateinit var favorites: FavoritesStore
@@ -56,6 +61,13 @@ class NerLanApp : Application(), ImageLoaderFactory {
     catalog = CatalogCache(cacheDir)
     // Keep the home-screen widgets in step with playback and the library.
     WidgetRefresher.start(this)
+    // Off-main: drop streamed-cache records whose bytes the LRU cache evicted,
+    // then fill episode numbers into records persisted before the field existed
+    // so the Downloads/AI lists sort in course order (no-op once done).
+    CoroutineScope(Dispatchers.IO).launch {
+      downloads.pruneCachedRecords { AudioCache.isFullyCached(this@NerLanApp, it.audio) }
+      EpisodeNumberBackfill.run()
+    }
     // Pull/push on launch when sync is on (no-op if not signed in).
     if (settings.syncToDrive.value) drive.syncNow()
     // Flush changes when the app goes to the background (ProcessLifecycleOwner's

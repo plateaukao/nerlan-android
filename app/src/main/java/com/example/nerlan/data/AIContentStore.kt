@@ -170,6 +170,19 @@ class AIContentStore(private val context: Context) {
     NerLanApp.instance.drive.requestSync()
   }
 
+  /** Backfill [EpisodeRecord.episodeNo] on index records saved before the field
+   *  existed (see [EpisodeNumberBackfill]). */
+  fun applyEpisodeNumbers(numbers: Map<String, Int>) {
+    var changed = false
+    val updated = _records.value.mapValues { (id, r) ->
+      if (r.episodeNo != null) r
+      else numbers[id]?.let { changed = true; r.copy(episodeNo = it) } ?: r
+    }
+    if (!changed) return
+    _records.value = updated
+    persist(updated)
+  }
+
   // MARK: Triggers
 
   fun processTranscript(record: EpisodeRecord) {

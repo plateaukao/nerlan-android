@@ -2,6 +2,7 @@ package com.example.nerlan.player
 
 import android.content.Context
 import android.net.Uri
+import androidx.media3.common.C
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
@@ -10,6 +11,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.FileDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import java.io.File
@@ -22,10 +24,11 @@ import java.io.File
  *
  * Kept separate from explicit downloads (which live in `filesDir/audio`): the
  * cache sits in `cacheDir` (purgeable by the OS, not backed up) and is wiped as a
- * unit by "clear cached audio" — it never appears in the Downloads tab. This is
- * the Android counterpart of the iOS `CachingPlayerItem` + `DownloadManager`
- * cache bucket. Unlike iOS, ExoPlayer caches per byte-range, so a partially
- * played episode keeps the ranges it fetched.
+ * unit by "clear cached audio". Fully-captured episodes show dimmed in the
+ * Downloads tab via [DownloadManager.cachedRecords]. This is the Android
+ * counterpart of the iOS `CachingPlayerItem` + `DownloadManager` cache bucket.
+ * Unlike iOS, ExoPlayer caches per byte-range, so a partially played episode
+ * keeps the ranges it fetched (and is not "fully cached" until every byte is).
  */
 object AudioCache {
   /** Cap for the streamed-audio cache. Unbounded, a daily streamer accrues
@@ -72,6 +75,27 @@ object AudioCache {
         .createDataSource()
       SchemeRoutingDataSource(FileDataSource(), cacheSource)
     }
+  }
+
+  /**
+   * Whether [url]'s resource is fully cached — content length known and every
+   * byte present. ExoPlayer caches per byte-range, so an episode the listener
+   * seeked through keeps holes and correctly reports false. Opens the cache if
+   * the player hasn't yet (reads its index file) — call off the main thread.
+   */
+  fun isFullyCached(context: Context, url: String?): Boolean {
+    if (url.isNullOrEmpty()) return false
+    val c = simpleCache(context)
+    val length = ContentMetadata.getContentLength(c.getContentMetadata(url))
+    if (length == C.LENGTH_UNSET.toLong()) return false
+    return c.getCachedBytes(url, 0, length) >= length
+  }
+
+  /** Evict one episode's cached bytes — deleting a cached row in the Downloads
+   *  tab, or an explicit download superseding the capture. */
+  fun removeResource(context: Context, url: String?) {
+    if (url.isNullOrEmpty()) return
+    simpleCache(context).removeResource(url)
   }
 
   /** Total bytes currently cached. Avoids initialising the cache if the player

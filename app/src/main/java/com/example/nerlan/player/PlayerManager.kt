@@ -125,6 +125,9 @@ object PlayerManager {
             // Played to the end: drop its resume point so a replay starts at the
             // top. _current is still the outgoing episode here.
             _current.value?.let { NerLanApp.instance.positions.clear(it.id) }
+            // Playing to the end is the moment a stream finishes filling the
+            // audio cache — register the capture for the Downloads tab.
+            noteCacheCapture(_current.value)
           }
           // A sentence loop never carries across episodes. play()/next()/previous()
           // already clear it, but transitions can also come from outside this
@@ -136,6 +139,9 @@ object PlayerManager {
           _current.value = record
           if (record != null) {
             NerLanApp.instance.recents.note(record)
+            // Already fully cached from an earlier listen? Registering here
+            // backfills captures made before records were kept.
+            noteCacheCapture(record)
             // Auto-advance lands at 0; if the listener had already started this
             // episode, pick up where they stopped (play() seeds its own start
             // position, and repeat-one deliberately restarts).
@@ -152,6 +158,7 @@ object PlayerManager {
           if (playbackState == Player.STATE_ENDED) {
             NerLanApp.instance.stats.noteCompleted(_current.value)
             _current.value?.let { NerLanApp.instance.positions.clear(it.id) }
+            noteCacheCapture(_current.value)
           }
         }
         override fun onEvents(player: Player, events: Player.Events) {
@@ -204,6 +211,19 @@ object PlayerManager {
           }
         }
         delay(500)
+      }
+    }
+  }
+
+  /** If [record]'s audio is now fully held by the streamed-audio cache, register
+   *  it so the Downloads tab lists the capture (dimmed). Skips downloads (their
+   *  file supersedes the cache). Cache probing reads the cache index — IO. */
+  private fun noteCacheCapture(record: EpisodeRecord?) {
+    val r = record ?: return
+    if (NerLanApp.instance.downloads.isDownloaded(r.id)) return
+    scope.launch(Dispatchers.IO) {
+      if (AudioCache.isFullyCached(NerLanApp.instance, r.audio)) {
+        NerLanApp.instance.downloads.noteCachedEpisode(r)
       }
     }
   }

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.nerlan.NerLanApp
+import com.example.nerlan.data.episodeOrder
 
 /**
  * Every episode that has a generated transcript or AI handout, grouped by
@@ -54,7 +55,7 @@ fun AiTabScreen() {
 
   val grouped = aiRecords
     .groupBy { if (grouping == 0) it.programName.ifEmpty { "其他" } else it.language.ifEmpty { "其他" } }
-    .mapValues { (_, list) -> list.sortedBy { it.playDate ?: "" } }
+    .mapValues { (_, list) -> list.sortedWith(episodeOrder) }
     .toSortedMap()
 
   LazyColumn(Modifier.fillMaxSize()) {

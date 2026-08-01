@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Favorite
@@ -31,8 +32,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -271,10 +275,16 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
   }
 }
 
-/** One episode row with play / favorite / download actions. Long-press opens
- *  the note editor — titles are often just "EP12", so a note is how the user
- *  records what the episode actually covers. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
+/** One episode row with play / favorite / download actions. A trailing swipe
+ *  or a long-press opens the note editor (mirroring iOS) — titles are often
+ *  just "EP12", so a note is how the user records what the episode actually
+ *  covers. The swipe box never dismisses: crossing the threshold opens the
+ *  editor and the row snaps back. */
+@OptIn(
+  ExperimentalMaterial3ExpressiveApi::class,
+  ExperimentalFoundationApi::class,
+  ExperimentalMaterial3Api::class,
+)
 @Composable
 fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecord>) {
   val favorites = NerLanApp.instance.favorites
@@ -292,60 +302,88 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
   val isDownloaded = downloadRecords.any { it.id == episode.episodeId } || downloads.isDownloaded(episode.episodeId)
   val progress = progressMap[episode.episodeId]
 
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    modifier = Modifier
-      .fillMaxWidth()
-      .combinedClickable(
-        onClick = {
-          if (!playable) return@combinedClickable
-          if (isCurrent) PlayerManager.togglePlayPause() else PlayerManager.play(record, queue)
-        },
-        onLongClick = { editingNote = true },
-      )
-      .padding(horizontal = 16.dp, vertical = 8.dp),
+  val dismissState = rememberSwipeToDismissBoxState(
+    confirmValueChange = { value ->
+      if (value == SwipeToDismissBoxValue.EndToStart) editingNote = true
+      value == SwipeToDismissBoxValue.Settled
+    }
+  )
+  SwipeToDismissBox(
+    state = dismissState,
+    enableDismissFromStartToEnd = false,
+    backgroundContent = {
+      Box(
+        Modifier
+          .fillMaxSize()
+          .background(MaterialTheme.colorScheme.tertiaryContainer)
+          .padding(horizontal = 20.dp),
+        contentAlignment = Alignment.CenterEnd,
+      ) {
+        Icon(
+          Icons.AutoMirrored.Filled.StickyNote2,
+          contentDescription = "註記",
+          tint = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
+      }
+    },
   ) {
-    Column(Modifier.weight(1f)) {
-      Text(
-        episode.displayTitle,
-        style = MaterialTheme.typography.bodyMedium,
-        color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-      )
-      Text(
-        listOfNotNull(
-          episode.episodeNumber?.let { "EP$it" },
-          episode.releaseDateText.takeIf { it.isNotEmpty() },
-          episode.durationText.takeIf { it.isNotEmpty() },
-        ).joinToString("  "),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      notesMap[episode.episodeId]?.let { EpisodeNoteText(it) }
-    }
-    IconButton(onClick = { favorites.toggle(record) }) {
-      Icon(
-        if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-        contentDescription = "收藏",
-        tint = MaterialTheme.colorScheme.error,
-      )
-    }
-    // All three states share the 48dp IconButton footprint so row columns align.
-    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-      when {
-        isDownloaded -> Icon(
-          Icons.Filled.CheckCircle,
-          contentDescription = "已下載",
-          tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(24.dp),
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier
+        .fillMaxWidth()
+        // Opaque so the swipe reveal doesn't bleed through the row.
+        .background(MaterialTheme.colorScheme.background)
+        .combinedClickable(
+          onClick = {
+            if (!playable) return@combinedClickable
+            if (isCurrent) PlayerManager.togglePlayPause() else PlayerManager.play(record, queue)
+          },
+          onLongClick = { editingNote = true },
         )
-        progress != null -> CircularWavyProgressIndicator(
-          progress = { progress },
-          modifier = Modifier.size(24.dp),
+        .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+      Column(Modifier.weight(1f)) {
+        Text(
+          episode.displayTitle,
+          style = MaterialTheme.typography.bodyMedium,
+          color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
         )
-        else -> IconButton(onClick = { downloads.download(record) }, enabled = playable) {
-          Icon(Icons.Filled.ArrowDownward, contentDescription = "下載")
+        Text(
+          listOfNotNull(
+            episode.episodeNumber?.let { "EP$it" },
+            episode.releaseDateText.takeIf { it.isNotEmpty() },
+            episode.durationText.takeIf { it.isNotEmpty() },
+          ).joinToString("  "),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        notesMap[episode.episodeId]?.let { EpisodeNoteText(it) }
+      }
+      IconButton(onClick = { favorites.toggle(record) }) {
+        Icon(
+          if (isFav) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+          contentDescription = "收藏",
+          tint = MaterialTheme.colorScheme.error,
+        )
+      }
+      // All three states share the 48dp IconButton footprint so row columns align.
+      Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        when {
+          isDownloaded -> Icon(
+            Icons.Filled.CheckCircle,
+            contentDescription = "已下載",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp),
+          )
+          progress != null -> CircularWavyProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.size(24.dp),
+          )
+          else -> IconButton(onClick = { downloads.download(record) }, enabled = playable) {
+            Icon(Icons.Filled.ArrowDownward, contentDescription = "下載")
+          }
         }
       }
     }

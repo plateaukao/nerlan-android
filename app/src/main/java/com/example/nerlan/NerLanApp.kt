@@ -11,6 +11,7 @@ import com.example.nerlan.data.AIContentStore
 import com.example.nerlan.data.CatalogCache
 import com.example.nerlan.data.DownloadManager
 import com.example.nerlan.data.DriveSync
+import com.example.nerlan.data.EpisodeNotesStore
 import com.example.nerlan.data.FavoritesStore
 import com.example.nerlan.data.ListeningStatsStore
 import com.example.nerlan.data.PlaybackPositionStore
@@ -45,6 +46,8 @@ class NerLanApp : Application(), ImageLoaderFactory {
     private set
   lateinit var recents: RecentShowsStore
     private set
+  lateinit var notes: EpisodeNotesStore
+    private set
 
   override fun onCreate() {
     super.onCreate()
@@ -54,6 +57,7 @@ class NerLanApp : Application(), ImageLoaderFactory {
     podcasts = PodcastStore(filesDir)
     positions = PlaybackPositionStore(filesDir)
     recents = RecentShowsStore(filesDir)
+    notes = EpisodeNotesStore(filesDir)
     settings = SettingsStore(this)
     ai = AIContentStore(this)
     stats = ListeningStatsStore(this)

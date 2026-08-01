@@ -1,7 +1,8 @@
 package com.example.nerlan.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -113,8 +114,9 @@ enum class DownloadBadge { DOWNLOADED, CACHED }
  *
  * When [onDelete] is set the row is wrapped in a [SwipeToDismissBox]: swipe it
  * right-to-left to remove (downloads delete the file, favorites un-favorite).
+ * Long-press opens the note editor (swipe stays free for delete).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun RecordRow(
   record: EpisodeRecord,
@@ -140,6 +142,8 @@ fun RecordRow(
   val panel = LocalStudyPanel.current
   val isCurrent = current?.id == record.id
   var showAttachment by remember { mutableStateOf(false) }
+  val notesMap by NerLanApp.instance.notes.notes.collectAsState()
+  var editingNote by remember { mutableStateOf(false) }
 
   val row = @Composable {
    Row(
@@ -148,9 +152,12 @@ fun RecordRow(
       .fillMaxWidth()
       // Opaque so the swipe-to-dismiss reveal doesn't bleed through the row.
       .background(MaterialTheme.colorScheme.background)
-      .clickable {
-        if (isCurrent) PlayerManager.togglePlayPause() else PlayerManager.play(record, queue)
-      }
+      .combinedClickable(
+        onClick = {
+          if (isCurrent) PlayerManager.togglePlayPause() else PlayerManager.play(record, queue)
+        },
+        onLongClick = { editingNote = true },
+      )
       .padding(horizontal = 16.dp, vertical = 8.dp),
   ) {
     CoverImage(record.coverUrl, 44.dp)
@@ -167,6 +174,7 @@ fun RecordRow(
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
+      notesMap[record.id]?.let { EpisodeNoteText(it) }
     }
     if (showFavorite) RowFavoriteButton(record)
     if (showDownload) RowDownloadButton(record)
@@ -232,6 +240,14 @@ fun RecordRow(
       title = record.title,
       attachments = record.pdfAttachments,
       onDismiss = { showAttachment = false },
+    )
+  }
+
+  if (editingNote) {
+    EpisodeNoteDialog(
+      episodeId = record.id,
+      episodeTitle = record.title,
+      onDismiss = { editingNote = false },
     )
   }
 }

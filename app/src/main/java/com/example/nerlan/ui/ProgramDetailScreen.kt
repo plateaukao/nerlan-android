@@ -1,7 +1,9 @@
 package com.example.nerlan.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -269,8 +271,10 @@ fun ProgramDetailScreen(program: Program, onBack: () -> Unit) {
   }
 }
 
-/** One episode row with play / favorite / download actions. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** One episode row with play / favorite / download actions. Long-press opens
+ *  the note editor — titles are often just "EP12", so a note is how the user
+ *  records what the episode actually covers. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecord>) {
   val favorites = NerLanApp.instance.favorites
@@ -279,6 +283,8 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
   val favEpisodes by favorites.episodes.collectAsState()
   val progressMap by downloads.progress.collectAsState()
   val downloadRecords by downloads.records.collectAsState()
+  val notesMap by NerLanApp.instance.notes.notes.collectAsState()
+  var editingNote by remember { mutableStateOf(false) }
 
   val isCurrent = current?.id == episode.episodeId
   val playable = episode.audioUrl != null
@@ -290,9 +296,13 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
     verticalAlignment = Alignment.CenterVertically,
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(enabled = playable) {
-        if (isCurrent) PlayerManager.togglePlayPause() else PlayerManager.play(record, queue)
-      }
+      .combinedClickable(
+        onClick = {
+          if (!playable) return@combinedClickable
+          if (isCurrent) PlayerManager.togglePlayPause() else PlayerManager.play(record, queue)
+        },
+        onLongClick = { editingNote = true },
+      )
       .padding(horizontal = 16.dp, vertical = 8.dp),
   ) {
     Column(Modifier.weight(1f)) {
@@ -312,6 +322,7 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
+      notesMap[episode.episodeId]?.let { EpisodeNoteText(it) }
     }
     IconButton(onClick = { favorites.toggle(record) }) {
       Icon(
@@ -338,5 +349,13 @@ fun EpisodeRow(episode: Episode, record: EpisodeRecord, queue: List<EpisodeRecor
         }
       }
     }
+  }
+
+  if (editingNote) {
+    EpisodeNoteDialog(
+      episodeId = episode.episodeId,
+      episodeTitle = episode.displayTitle,
+      onDismiss = { editingNote = false },
+    )
   }
 }

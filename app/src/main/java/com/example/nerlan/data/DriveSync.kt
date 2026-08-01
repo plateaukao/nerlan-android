@@ -221,6 +221,14 @@ class DriveSync(private val context: Context) {
           json.encodeToString(merged).toByteArray()
         }
       },
+      async {
+        syncMetadataFile(token, remote, prev.files["episode-notes.json"], "episode-notes.json", notesFile) { l, r ->
+          // Union-merge, local wins on key conflict; sorted for stable bytes.
+          val merged: Map<String, String> =
+            (decodeNotes(r) + decodeNotes(l)).toList().sortedBy { it.first }.toMap()
+          json.encodeToString(merged).toByteArray()
+        }
+      },
       // Podcast subscriptions: union-merge the feed data plus a last-writer-wins
       // subscription ledger, keeping only feeds the merged ledger marks subscribed.
       async { syncPodcasts(token, remote, prev) },
@@ -242,6 +250,7 @@ class DriveSync(private val context: Context) {
       NerLanApp.instance.favorites.reload()
       NerLanApp.instance.ai.reloadIndex()
       NerLanApp.instance.podcasts.reload()
+      NerLanApp.instance.notes.reload()
     }
     pushed to pulled
   }
@@ -399,6 +408,7 @@ class DriveSync(private val context: Context) {
   // MARK: - Local file mapping
 
   private val favoritesFile get() = File(filesDir, "favorites.json")
+  private val notesFile get() = File(filesDir, "episode-notes.json")
   private val programsFile get() = File(filesDir, "favorite-programs.json")
   private val indexFile get() = File(filesDir, "ai/index.json")
   private val podcastsFile get() = File(filesDir, "podcasts.json")
@@ -409,6 +419,9 @@ class DriveSync(private val context: Context) {
 
   private fun decodeMap(bytes: ByteArray?): Map<String, EpisodeRecord> =
     bytes?.let { runCatching { json.decodeFromString<Map<String, EpisodeRecord>>(String(it)) }.getOrNull() } ?: emptyMap()
+
+  private fun decodeNotes(bytes: ByteArray?): Map<String, String> =
+    bytes?.let { runCatching { json.decodeFromString<Map<String, String>>(String(it)) }.getOrNull() } ?: emptyMap()
 
   /** drive name -> local content file, for transcripts, handouts, cue sidecars,
    *  and translation sidecars. */

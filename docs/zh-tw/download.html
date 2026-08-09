@@ -1,0 +1,108 @@
+<!-- translated-from: ../download.html @ e503b50 -->
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>下載 NerLan</title>
+  <meta name="description" content="取得最新版 NerLan，並閱讀更新內容。">
+  <link rel="stylesheet" href="../style.css">
+  <script defer src="../lang-banner.js"></script>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="container">
+    <a href="index.html" class="site-nav__logo">NerLan<span class="dot">.</span></a>
+    <button class="nav-toggle" onclick="document.querySelector('.site-nav__links').classList.toggle('open')" aria-label="切換選單">&#9776;</button>
+    <ul class="site-nav__links">
+      <li><a href="guide.html">使用說明</a></li>
+      <li><a href="download.html" class="active">下載</a></li>
+      <li><a href="https://github.com/plateaukao/nerlan-android">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="page-header">
+  <div class="container">
+    <h1>下載</h1>
+    <p>NerLan 免費且開放原始碼。發行版是已簽章的安裝檔，發佈在 GitHub。</p>
+  </div>
+</header>
+
+<div class="container">
+  <div class="download-cards">
+    <div class="download-card">
+      <h3>最新版本</h3>
+      <p>從 Releases 頁面取得最新的已簽章版本——附件 <code>NerLan-vX.Y.apk</code> 可直接安裝，並會原地升級舊版。</p>
+      <a class="btn btn--primary" href="https://github.com/plateaukao/nerlan-android/releases/latest">取得最新版本</a>
+    </div>
+    <div class="download-card">
+      <h3>所有版本與原始碼</h3>
+      <p>每個版本與完整更新說明都在 GitHub——也可以在那裡瀏覽原始碼或回報問題。</p>
+      <a class="btn btn--ghost" href="https://github.com/plateaukao/nerlan-android/releases">所有版本</a>
+    </div>
+  </div>
+
+  <h2 id="changelog">更新內容</h2>
+
+  <div class="changelog-version">
+    <h3>1.8</h3>
+    <h4>主畫面小工具</h4>
+    <ul>
+      <li><strong>繼續收聽</strong>——正在播放的單集，附倒轉 15 秒／播放暫停／下一集按鈕；放大後還會列出接下來要播的內容。</li>
+      <li><strong>最近播放</strong>——最近聽過的節目，一按就從上次停下的地方繼續，整個節目接著往下播。</li>
+      <li><strong>我的節目</strong>——收藏節目與訂閱 Podcast 的封面牆，可自選要顯示哪幾個、以什麼順序。</li>
+      <li><strong>學習紀錄</strong>——今天聽了幾分鐘、連續學習幾天、本週總計。</li>
+    </ul>
+    <h4>記住播放進度</h4>
+    <ul>
+      <li>每一集的播放位置都會存下來，之後再打開就從上次停下的地方接著聽；聽完一集會自動清掉進度，重聽從頭播放。</li>
+      <li>新的最近播放清單——與收藏分開——記錄你正在進行的課程。</li>
+    </ul>
+  </div>
+
+  <div class="changelog-version">
+    <h3>1.7</h3>
+    <h4>App 圖示</h4>
+    <ul>
+      <li>全新「Tune In」圖示——橘色漸層上帶著微笑的白色耳機，並提供主題化與舊裝置版本。</li>
+    </ul>
+    <h4>節目與 Podcast</h4>
+    <ul>
+      <li>語言篩選收合為單列，選擇的篩選會跨啟動記住。</li>
+      <li>新增 Podcast 對話框可直接連到 Apple Podcasts 搜尋節目。</li>
+    </ul>
+  </div>
+
+  <div class="changelog-version">
+    <h3>1.6</h3>
+    <h4>播放與播放器</h4>
+    <ul>
+      <li>關閉螢幕後音檔不再中斷；點播放通知會開啟 App。</li>
+      <li>串流音檔快取上限 2&nbsp;GB（淘汰最久未使用）。</li>
+      <li>播放器啟動更穩定，並修正多項播放器效能問題。</li>
+    </ul>
+    <h4>AI 工作與同步</h4>
+    <ul>
+      <li>重試 會重新啟動失敗的逐字稿或講義工作；重複的轉錄請求共用同一個工作。</li>
+      <li>翻譯保留中間空行，讓雙語列對齊。</li>
+      <li>雲端同步不再取消進行中的工作，大量資料也能完整分頁同步。</li>
+    </ul>
+    <h4>穩定性</h4>
+    <ul>
+      <li>修正閃退、原子性寫入紀錄檔、PDF 與講義檢視器正確釋放資源。</li>
+    </ul>
+  </div>
+
+  <p style="margin: 2rem 0 3rem;">更早的版本請見 <a href="https://github.com/plateaukao/nerlan-android/releases">完整版本紀錄</a>。</p>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    NerLan 是開放原始碼軟體。課程內容由國立教育廣播電臺提供；Podcast 內容來自各節目自己的 feed。
+  </div>
+</footer>
+
+</body>
+</html>

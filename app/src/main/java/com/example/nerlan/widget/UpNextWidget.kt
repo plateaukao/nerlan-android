@@ -2,7 +2,6 @@ package com.example.nerlan.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -17,6 +16,7 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import com.example.nerlan.R
 
@@ -26,24 +26,34 @@ import com.example.nerlan.R
  * useful from the first launch.
  */
 class UpNextWidget : GlanceAppWidget() {
-  override val sizeMode = SizeMode.Responsive(
-    setOf(SMALL, WIDE, TALL)
-  )
+  // Exact, not Responsive: the old 250dp "tall" bucket meant a 2-cell-high
+  // widget (~224dp) never got the 接下來 list even though one row fits, so its
+  // bottom half sat empty. Row count now comes from the real height.
+  override val sizeMode = SizeMode.Exact
 
   override suspend fun provideGlance(context: Context, id: GlanceId) {
     val model = WidgetModelBuilder.build(context)
     val heroCover = loadCoverBitmap(context, model.lead?.coverUrl, 160)
-    val rowCovers = loadCovers(context, model.upNext.take(3).map { it.coverUrl }, 96)
+    val rowCovers = loadCovers(context, model.upNext.take(MAX_NEXT).map { it.coverUrl }, 96)
 
     provideContent {
       GlanceTheme {
         WidgetSurface {
           val size = LocalSize.current
+          val lead = model.lead
+          // Inner space after WidgetSurface's 12dp padding; how many queue rows
+          // fit under the hero block decides the layout.
+          val innerHeight = size.height.value - 24f
+          val nextRows = ((innerHeight - HERO_BLOCK_DP - HEADER_DP) / ROW_DP)
+            .toInt().coerceIn(0, MAX_NEXT)
+          val rest =
+            if (lead == null) emptyList()
+            else model.upNext.dropWhile { it.id == lead.id }.take(nextRows)
           when {
-            model.lead == null ->
+            lead == null ->
               WidgetEmptyState("還沒有可以播放的單集\n先下載或收藏一集吧", openTabAction("programs"))
-            size.height >= TALL.height -> Tall(model, heroCover, rowCovers)
-            size.width >= WIDE.width -> Wide(model, heroCover)
+            rest.isNotEmpty() -> Tall(model, heroCover, rowCovers, rest)
+            size.width >= 250.dp -> Wide(model, heroCover)
             else -> Small(model, heroCover)
           }
         }
@@ -54,7 +64,10 @@ class UpNextWidget : GlanceAppWidget() {
   @Composable
   private fun Small(model: WidgetModel, hero: android.graphics.Bitmap?) {
     val lead = model.lead ?: return
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
+    Column(
+      modifier = GlanceModifier.fillMaxSize(),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
       Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         WidgetCover(hero, sizeDp = 48, onClick = openPlayerAction())
         RowSpacer(8)
@@ -75,7 +88,7 @@ class UpNextWidget : GlanceAppWidget() {
   @Composable
   private fun Wide(model: WidgetModel, hero: android.graphics.Bitmap?) {
     val lead = model.lead ?: return
-    Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
       WidgetCover(hero, sizeDp = 72, onClick = openPlayerAction())
       RowSpacer(12)
       Column(modifier = GlanceModifier.defaultWeight()) {
@@ -102,11 +115,17 @@ class UpNextWidget : GlanceAppWidget() {
     model: WidgetModel,
     hero: android.graphics.Bitmap?,
     rowCovers: Map<String, android.graphics.Bitmap>,
+    // Pre-sliced to what the measured height fits; on the "nothing loaded"
+    // path the lead came out of upNext itself, hence the dropWhile upstream.
+    rest: List<WidgetEpisode>,
   ) {
     val lead = model.lead ?: return
-    Column(modifier = GlanceModifier.fillMaxWidth()) {
+    Column(
+      modifier = GlanceModifier.fillMaxSize(),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
       Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        WidgetCover(hero, sizeDp = 64, onClick = openPlayerAction())
+        WidgetCover(hero, sizeDp = 56, onClick = openPlayerAction())
         RowSpacer(12)
         Column(modifier = GlanceModifier.defaultWeight().clickable(openPlayerAction())) {
           WidgetCaption(lead.programName)
@@ -117,24 +136,20 @@ class UpNextWidget : GlanceAppWidget() {
           }
         }
       }
-      ColSpacer(8)
+      ColSpacer(6)
       Transport(model)
-      ColSpacer(10)
-      // On the "nothing loaded" path the lead came out of upNext itself.
-      val rest = model.upNext.dropWhile { it.id == lead.id }.take(3)
-      if (rest.isNotEmpty()) {
-        WidgetHeader("接下來")
-        rest.forEach { episode ->
-          WidgetListRow(
-            bitmap = rowCovers.cover(episode.coverUrl),
-            title = episode.title,
-            caption = episode.programName,
-            progress = null,
-            openAction = playEpisodeAction(episode.id),
-            buttonRes = R.drawable.ic_widget_play,
-            buttonAction = playEpisodeAction(episode.id),
-          )
-        }
+      ColSpacer(8)
+      WidgetHeader("接下來")
+      rest.forEach { episode ->
+        WidgetListRow(
+          bitmap = rowCovers.cover(episode.coverUrl),
+          title = episode.title,
+          caption = episode.programName,
+          progress = null,
+          openAction = playEpisodeAction(episode.id),
+          buttonRes = R.drawable.ic_widget_play,
+          buttonAction = playEpisodeAction(episode.id),
+        )
       }
     }
   }
@@ -178,9 +193,12 @@ class UpNextWidget : GlanceAppWidget() {
   }
 
   private companion object {
-    val SMALL = DpSize(140.dp, 120.dp)
-    val WIDE = DpSize(250.dp, 120.dp)
-    val TALL = DpSize(250.dp, 250.dp)
+    const val MAX_NEXT = 3
+
+    /** Hero row (56dp cover) + spacers + transport row, in dp. */
+    const val HERO_BLOCK_DP = 110f
+    const val HEADER_DP = 26f
+    const val ROW_DP = 56f
   }
 }
 

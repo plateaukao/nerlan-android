@@ -1,8 +1,6 @@
 package com.example.nerlan.widget
 
 import android.content.Context
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -15,6 +13,7 @@ import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.Row
+import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import com.example.nerlan.R
 
@@ -28,21 +27,24 @@ import com.example.nerlan.R
  * from the home screen.
  */
 class RecentShowsWidget : GlanceAppWidget() {
-  override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE, TALL))
+  // Exact, not Responsive: the coarse buckets left a 2-cell-high widget showing
+  // 2 rows where 3 fit, with the slack pooling as dead space at the bottom.
+  override val sizeMode = SizeMode.Exact
 
   override suspend fun provideGlance(context: Context, id: GlanceId) {
     val model = WidgetModelBuilder.build(context)
-    val covers = loadCovers(context, model.recents.take(5).map { it.coverUrl }, 128)
+    val covers = loadCovers(context, model.recents.take(MAX_ROWS).map { it.coverUrl }, 128)
 
     provideContent {
       GlanceTheme {
         WidgetSurface {
           val size = LocalSize.current
-          val rows = when {
-            size.height >= TALL.height -> 5
-            size.width >= WIDE.width -> 2
-            else -> 1
-          }
+          // Inner space after WidgetSurface's 12dp padding; every row the height
+          // actually fits gets used (a WidgetListRow runs ~56dp).
+          val innerHeight = size.height.value - 24f
+          val rows =
+            if (innerHeight < 150f) 1
+            else ((innerHeight - HEADER_DP) / ROW_DP).toInt().coerceIn(1, MAX_ROWS)
           val shows = model.recents.take(rows)
           when {
             shows.isEmpty() ->
@@ -50,7 +52,10 @@ class RecentShowsWidget : GlanceAppWidget() {
 
             rows == 1 -> {
               val show = shows.first()
-              Column(modifier = GlanceModifier.fillMaxWidth()) {
+              Column(
+                modifier = GlanceModifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
                 Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
                   WidgetCover(
                     covers.cover(show.coverUrl), sizeDp = 48,
@@ -74,7 +79,10 @@ class RecentShowsWidget : GlanceAppWidget() {
               }
             }
 
-            else -> Column(modifier = GlanceModifier.fillMaxWidth()) {
+            else -> Column(
+              modifier = GlanceModifier.fillMaxSize(),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
               WidgetHeader("最近播放")
               shows.forEach { show ->
                 WidgetListRow(
@@ -95,9 +103,9 @@ class RecentShowsWidget : GlanceAppWidget() {
   }
 
   private companion object {
-    val SMALL = DpSize(140.dp, 120.dp)
-    val WIDE = DpSize(250.dp, 120.dp)
-    val TALL = DpSize(250.dp, 250.dp)
+    const val MAX_ROWS = 6
+    const val HEADER_DP = 26f
+    const val ROW_DP = 56f
   }
 }
 

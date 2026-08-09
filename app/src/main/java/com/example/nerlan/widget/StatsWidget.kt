@@ -1,8 +1,6 @@
 package com.example.nerlan.widget
 
 import android.content.Context
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -13,6 +11,7 @@ import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
+import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
@@ -27,7 +26,10 @@ import androidx.glance.text.TextStyle
  * wants glanceable.
  */
 class StatsWidget : GlanceAppWidget() {
-  override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE))
+  // Exact, not Responsive: the number and goal bar scale with the real cell
+  // size, and the block centers vertically, so a big cell reads as a big
+  // stat instead of a small one floating over dead space.
+  override val sizeMode = SizeMode.Exact
 
   override suspend fun provideGlance(context: Context, id: GlanceId) {
     val model = WidgetModelBuilder.build(context)
@@ -35,17 +37,24 @@ class StatsWidget : GlanceAppWidget() {
     provideContent {
       GlanceTheme {
         WidgetSurface {
-          val wide = LocalSize.current.width >= WIDE.width
+          val size = LocalSize.current
+          val innerHeight = size.height.value - 24f
+          val numberSp = when {
+            innerHeight >= 170f -> 56
+            innerHeight >= 120f -> 42
+            else -> 30
+          }
           val stats = model.stats
           Column(
-            modifier = GlanceModifier.fillMaxSize().clickable(openTabAction("programs"))
+            modifier = GlanceModifier.fillMaxSize().clickable(openTabAction("programs")),
+            verticalAlignment = Alignment.CenterVertically,
           ) {
             WidgetCaption("今日學習")
             Text(
               text = "${stats.minutesToday}",
               style = TextStyle(
                 color = GlanceTheme.colors.onSurface,
-                fontSize = if (wide) 34.sp else 30.sp,
+                fontSize = numberSp.sp,
                 fontWeight = FontWeight.Bold,
               ),
             )
@@ -55,7 +64,8 @@ class StatsWidget : GlanceAppWidget() {
             // the app lets the goal be configured.
             WidgetProgressBar(
               (stats.minutesToday / 30f).coerceIn(0f, 1f),
-              widthDp = if (wide) 180 else 110,
+              widthDp = (size.width.value - 28f).toInt(),
+              heightDp = if (innerHeight >= 170f) 6 else 4,
             )
             ColSpacer(6)
             Column(modifier = GlanceModifier.fillMaxWidth()) {
@@ -66,11 +76,6 @@ class StatsWidget : GlanceAppWidget() {
         }
       }
     }
-  }
-
-  private companion object {
-    val SMALL = DpSize(110.dp, 110.dp)
-    val WIDE = DpSize(220.dp, 110.dp)
   }
 }
 

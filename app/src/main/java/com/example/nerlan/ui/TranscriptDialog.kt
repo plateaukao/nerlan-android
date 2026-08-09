@@ -396,7 +396,7 @@ fun TranscriptContent(
     when {
       next == 0 -> { translateMode = 0; settings.setTranscriptTranslateMode(0) }
       translation != null -> { translateMode = next; settings.setTranscriptTranslateMode(next) }
-      settings.apiKey.value.isBlank() -> errorMessage = "尚未設定 OpenAI API 金鑰，無法翻譯。"
+      !settings.aiConfigured.value -> errorMessage = "尚未設定 AI 伺服器，無法翻譯。"
       else -> { pendingMode = next; ai.translate(record) }
     }
   }

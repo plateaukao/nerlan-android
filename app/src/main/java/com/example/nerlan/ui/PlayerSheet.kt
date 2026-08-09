@@ -68,7 +68,7 @@ fun PlayerSheet(onDismiss: () -> Unit) {
   val favorites = NerLanApp.instance.favorites
   val downloads = NerLanApp.instance.downloads
   val ai = NerLanApp.instance.ai
-  val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
+  val aiConfigured by NerLanApp.instance.settings.aiConfigured.collectAsState()
   val panel = LocalStudyPanel.current
   val current by PlayerManager.current.collectAsState()
   val isPlaying by PlayerManager.isPlaying.collectAsState()
@@ -288,8 +288,9 @@ fun PlayerSheet(onDismiss: () -> Unit) {
         }
       }
 
-      // AI tools (caption / transcript / handout) — only once an API key is set.
-      if (apiKey.isNotBlank()) {
+      // AI tools (caption / transcript / handout) — only once AI is configured
+      // (official: key set; custom: server URL set).
+      if (aiConfigured) {
         Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(24.dp, Alignment.CenterHorizontally),

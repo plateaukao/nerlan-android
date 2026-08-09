@@ -1,10 +1,14 @@
 package com.example.nerlan.data
 
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -20,15 +24,33 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 
 /**
- * Stateless client for the OpenAI REST API: transcribe an episode's audio and
- * turn that transcript into a study handout. Mirrors the iOS `OpenAIService`.
- * Uses a long-timeout client because transcribing a ~30-min episode (and
- * generating a handout from a long transcript) can take minutes server-side.
+ * Stateless client for any OpenAI-compatible REST API: transcribe an episode's
+ * audio and turn that transcript into a study handout. Mirrors the iOS
+ * `OpenAIService`. Uses a long-timeout client because transcribing a ~30-min
+ * episode (and generating a handout from a long transcript) can take minutes
+ * server-side — more on a self-hosted LAN server.
  */
 object OpenAIService {
-  private const val BASE = "https://api.openai.com/v1"
+  const val OFFICIAL_BASE = "https://api.openai.com/v1"
+
+  /**
+   * Where and how one operation talks to a server: base URL (up to /v1), key,
+   * and model, resolved per call by SettingsStore from the active API provider.
+   * Mirrors the iOS `OpenAIService.Config`.
+   */
+  data class Config(
+    val baseUrl: String,
+    val apiKey: String,
+    val model: String,
+    /** Official OpenAI always needs a key; custom (often local) servers don't. */
+    val requiresKey: Boolean = true,
+    /** When true, chat requests add reasoning_effort=none so local thinking
+     *  models (qwen3, deepseek-r1, …) skip their reasoning dump. */
+    val disableThinking: Boolean = false,
+  )
 
   private val client = OkHttpClient.Builder()
     .connectTimeout(30, TimeUnit.SECONDS)
@@ -70,28 +92,23 @@ object OpenAIService {
    */
   suspend fun transcribe(
     file: File,
-    model: String,
-    apiKey: String,
+    config: Config,
     prompt: String? = null,
     language: String? = null,
   ): TranscriptionResult = withContext(Dispatchers.IO) {
-    if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
-    val wantSegments = supportsSegments(model)
+    requireKey(config)
+    val wantSegments = supportsSegments(config.model)
     val body = MultipartBody.Builder().setType(MultipartBody.FORM)
-      .addFormDataPart("model", model)
+      .addFormDataPart("model", config.model)
       .addFormDataPart("response_format", if (wantSegments) "verbose_json" else "text")
       .apply { if (!language.isNullOrBlank()) addFormDataPart("language", language) }
       .apply { if (!prompt.isNullOrBlank()) addFormDataPart("prompt", prompt) }
       .addFormDataPart("file", file.name, file.asRequestBody("application/octet-stream".toMediaType()))
       .build()
-    val request = Request.Builder()
-      .url("$BASE/audio/transcriptions")
-      .header("Authorization", "Bearer $apiKey")
-      .post(body)
-      .build()
+    val request = request(config, "audio/transcriptions").post(body).build()
     client.newCall(request).execute().use { response ->
       val bodyStr = response.body?.string().orEmpty()
-      if (!response.isSuccessful) throw OpenAIException(errorMessage(bodyStr) ?: "OpenAI 請求失敗（HTTP ${response.code}）")
+      if (!response.isSuccessful) throw httpError(response, bodyStr)
       if (!wantSegments) return@use TranscriptionResult(bodyStr.trim(), emptyList())
       // verbose_json: { "text": "...", "segments": [ { "start": 0.0, "text": "..." }, ... ] }
       val root = runCatching { json.parseToJsonElement(bodyStr).jsonObject }
@@ -142,8 +159,8 @@ object OpenAIService {
    * often returns text with little punctuation. Long transcripts are chunked so
    * no single response is truncated.
    */
-  suspend fun segmentTranscript(raw: String, model: String, apiKey: String): String {
-    if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
+  suspend fun segmentTranscript(raw: String, config: Config): String {
+    requireKey(config)
     val system = buildString {
       append("你是一個只負責加上標點與斷句的文字編輯器。你會收到一段語音辨識（ASR）產生的逐字稿，通常缺少標點。")
       append("規則：")
@@ -167,7 +184,7 @@ object OpenAIService {
       var segmented: String? = null
       for (attempt in 0..1) {
         try {
-          segmented = chat(system, piece, model, apiKey, temperature = 0.0).trim()
+          segmented = chat(system, piece, config, temperature = 0.0).trim()
           break
         } catch (e: Exception) {
           if (attempt == 1) segmented = piece
@@ -196,11 +213,10 @@ object OpenAIService {
   suspend fun translateSentences(
     sentences: List<String>,
     language: String,
-    model: String,
-    apiKey: String,
+    config: Config,
     onPartial: ((List<String>) -> Unit)? = null,
   ): List<String> {
-    if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
+    requireKey(config)
     if (sentences.isEmpty()) return emptyList()
     val system = buildString {
       append("你是一位專業翻譯。你會收到一段逐字稿，每行一句（內容可能混合中文與外語）。")
@@ -213,7 +229,7 @@ object OpenAIService {
     val out = ArrayList<String>(sentences.size)
     for (batch in lineBatches(sentences, maxLines = 40, maxChars = 3000)) {
       // temperature 0: keep the mapping faithful and the line count stable.
-      val raw = chat(system, batch.joinToString("\n"), model, apiKey, temperature = 0.0)
+      val raw = chat(system, batch.joinToString("\n"), config, temperature = 0.0)
       out += reconcileBatch(raw, batch.size)
       onPartial?.invoke(out.toList())
     }
@@ -271,10 +287,9 @@ object OpenAIService {
     transcript: String,
     record: EpisodeRecord,
     partTitle: String? = null,
-    model: String,
-    apiKey: String,
+    config: Config,
   ): String {
-    if (apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
+    requireKey(config)
     val tag = if (partTitle == null) "h2" else "h3"
     val partNote = if (partTitle == null) ""
       else "你收到的是整集節目其中一段（約 15 分鐘）的逐字稿，請只根據這一段的內容製作講義。"
@@ -292,7 +307,7 @@ object OpenAIService {
       append("不要輸出 <html>、<head>、<body> 標籤，也不要使用 Markdown 或程式碼圍欄。")
     }
     val user = "節目：${record.programName}\n單集：${record.title}\n\n逐字稿：\n$transcript"
-    val fragment = stripCodeFence(chat(system, user, model, apiKey))
+    val fragment = stripCodeFence(chat(system, user, config))
     return if (partTitle == null) fragment else "<h2>$partTitle</h2>\n$fragment"
   }
 
@@ -304,27 +319,25 @@ object OpenAIService {
   private suspend fun chat(
     system: String,
     user: String,
-    model: String,
-    apiKey: String,
+    config: Config,
     temperature: Double? = null,
   ): String =
     withContext(Dispatchers.IO) {
       val payload = buildJsonObject {
-        put("model", model)
+        put("model", config.model)
         if (temperature != null) put("temperature", temperature)
+        if (config.disableThinking) put("reasoning_effort", "none")
         putJsonArray("messages") {
           addJsonObject { put("role", "system"); put("content", system) }
           addJsonObject { put("role", "user"); put("content", user) }
         }
       }
-      val request = Request.Builder()
-        .url("$BASE/chat/completions")
-        .header("Authorization", "Bearer $apiKey")
+      val request = request(config, "chat/completions")
         .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
         .build()
       client.newCall(request).execute().use { response ->
         val bodyStr = response.body?.string().orEmpty()
-        if (!response.isSuccessful) throw OpenAIException(errorMessage(bodyStr) ?: "OpenAI 請求失敗（HTTP ${response.code}）")
+        if (!response.isSuccessful) throw httpError(response, bodyStr)
         runCatching {
           json.parseToJsonElement(bodyStr).jsonObject["choices"]!!.jsonArray
             .first().jsonObject["message"]!!.jsonObject["content"]!!.jsonPrimitive.content
@@ -332,8 +345,81 @@ object OpenAIService {
       }
     }
 
+  // MARK: Server verification
+
+  /** Probe a custom transcription server by transcribing a half-second of
+   *  silence — proves the URL, key and model actually accept a request. Throws
+   *  an OpenAIException with the server's message on failure. */
+  suspend fun verifyTranscription(config: Config): Unit = withContext(Dispatchers.IO) {
+    requireKey(config)
+    val body = MultipartBody.Builder().setType(MultipartBody.FORM)
+      .addFormDataPart("model", config.model)
+      .addFormDataPart("response_format", "text")
+      .addFormDataPart("file", "probe.wav", silentWav().toRequestBody("audio/wav".toMediaType()))
+      .build()
+    val request = request(config, "audio/transcriptions").post(body).build()
+    client.newCall(request).execute().use { response ->
+      val bodyStr = response.body?.string().orEmpty()
+      if (!response.isSuccessful) throw httpError(response, bodyStr)
+    }
+  }
+
+  /** Probe a custom chat server with a one-word completion. Throws an
+   *  OpenAIException with the server's message on failure. */
+  suspend fun verifyChat(config: Config) {
+    chat(system = "You are a connectivity check.", user = "Reply with the single word: OK",
+      config = config, temperature = 0.0)
+  }
+
+  /** 0.5 s of 16 kHz mono 16-bit PCM silence as a complete WAV file. */
+  private fun silentWav(): ByteArray {
+    val sampleRate = 16_000
+    val dataSize = sampleRate / 2 * 2 // 0.5 s of 16-bit samples
+    val buffer = ByteBuffer.allocate(44 + dataSize).order(ByteOrder.LITTLE_ENDIAN)
+    buffer.put("RIFF".toByteArray(Charsets.US_ASCII)).putInt(36 + dataSize)
+    buffer.put("WAVE".toByteArray(Charsets.US_ASCII))
+    buffer.put("fmt ".toByteArray(Charsets.US_ASCII)).putInt(16)
+    buffer.putShort(1).putShort(1).putInt(sampleRate).putInt(sampleRate * 2).putShort(2).putShort(16)
+    buffer.put("data".toByteArray(Charsets.US_ASCII)).putInt(dataSize)
+    return buffer.array()
+  }
+
+  // MARK: Request plumbing
+
+  /** Request builder for a config's endpoint. The Authorization header is only
+   *  attached when a key exists — keyless local servers reject a Bearer header
+   *  less gracefully than no header at all. */
+  private fun request(config: Config, path: String): Request.Builder =
+    Request.Builder()
+      .url("${config.baseUrl.trimEnd('/')}/$path")
+      .apply { if (config.apiKey.isNotBlank()) header("Authorization", "Bearer ${config.apiKey}") }
+
+  private fun requireKey(config: Config) {
+    if (config.requiresKey && config.apiKey.isBlank()) throw OpenAIException("尚未設定 OpenAI API 金鑰")
+  }
+
+  /** Build the user-facing failure for a non-2xx response: the server's own
+   *  message when one can be parsed, else host + status + a body snippet so a
+   *  misconfigured custom server stays diagnosable. */
+  private fun httpError(response: Response, bodyStr: String): OpenAIException {
+    errorMessage(bodyStr)?.let { return OpenAIException(it) }
+    val host = response.request.url.host
+    val snippet = bodyStr.trim().take(300)
+    return OpenAIException(
+      if (snippet.isEmpty()) "$host 請求失敗（HTTP ${response.code}）"
+      else "$host 請求失敗（HTTP ${response.code}）：$snippet",
+    )
+  }
+
+  /** The error message shapes of OpenAI ({"error":{"message":…}}), Ollama
+   *  ({"error":"…"}) and some proxies ({"message":"…"}). */
   private fun errorMessage(bodyStr: String): String? = runCatching {
-    json.parseToJsonElement(bodyStr).jsonObject["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+    val root = json.parseToJsonElement(bodyStr).jsonObject
+    when (val error = root["error"]) {
+      is JsonObject -> error["message"]?.jsonPrimitive?.contentOrNull
+      is JsonPrimitive -> error.contentOrNull
+      else -> root["message"]?.jsonPrimitive?.contentOrNull
+    }
   }.getOrNull()
 
   /** Models sometimes wrap HTML in ```html fences despite instructions. */

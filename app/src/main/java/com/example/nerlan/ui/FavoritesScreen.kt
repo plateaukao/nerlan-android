@@ -136,7 +136,7 @@ fun RecordRow(
   downloadBadge: DownloadBadge? = null,
 ) {
   val current by PlayerManager.current.collectAsState()
-  val apiKey by NerLanApp.instance.settings.apiKey.collectAsState()
+  val aiConfigured by NerLanApp.instance.settings.aiConfigured.collectAsState()
   val ai = NerLanApp.instance.ai
   val revision by ai.revision.collectAsState()
   val panel = LocalStudyPanel.current
@@ -189,7 +189,7 @@ fun RecordRow(
         val hasHandout = remember(revision, record.id) { ai.hasHandout(record.id) }
         if (hasTranscript) AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
         if (hasHandout) AiActionButton(AiKind.HANDOUT, record, compact = true)
-      } else if (apiKey.isNotBlank()) {
+      } else if (aiConfigured) {
         AiActionButton(AiKind.TRANSCRIPT, record, compact = true)
         AiActionButton(AiKind.HANDOUT, record, compact = true)
       }

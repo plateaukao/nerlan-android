@@ -9,12 +9,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -24,6 +29,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -39,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -47,6 +56,7 @@ import android.text.format.Formatter
 import com.example.nerlan.NerLanApp
 import com.example.nerlan.data.DriveSync
 import com.example.nerlan.data.GmsFailure
+import com.example.nerlan.data.OpenAIService
 import com.example.nerlan.data.SettingsStore
 import com.example.nerlan.player.AudioCache
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -67,6 +77,14 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   val apiKey by settings.apiKey.collectAsState()
   val chatModel by settings.chatModel.collectAsState()
   val transcriptionModel by settings.transcriptionModel.collectAsState()
+  val apiProvider by settings.apiProvider.collectAsState()
+  val customTranscriptionUrl by settings.customTranscriptionUrl.collectAsState()
+  val customTranscriptionModel by settings.customTranscriptionModel.collectAsState()
+  val customTranscriptionKey by settings.customTranscriptionKey.collectAsState()
+  val customChatUrl by settings.customChatUrl.collectAsState()
+  val customChatModel by settings.customChatModel.collectAsState()
+  val customChatKey by settings.customChatKey.collectAsState()
+  val customChatNoThink by settings.customChatNoThink.collectAsState()
   val cacheStreamedAudio by settings.cacheStreamedAudio.collectAsState()
   val translationLanguage by settings.translationLanguage.collectAsState()
   val scrollAnimated by settings.transcriptScrollAnimated.collectAsState()
@@ -105,6 +123,9 @@ fun SettingsScreen(onDismiss: () -> Unit) {
   var modelMenuExpanded by remember { mutableStateOf(false) }
   var translationMenuExpanded by remember { mutableStateOf(false) }
   var cacheBytes by remember { mutableStateOf(AudioCache.sizeBytes(NerLanApp.instance)) }
+  // Verification probe results; any edit to that server's fields resets to Idle.
+  var transcriptionProbe by remember { mutableStateOf<ProbeState>(ProbeState.Idle) }
+  var chatProbe by remember { mutableStateOf<ProbeState>(ProbeState.Idle) }
 
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
     Surface(Modifier.fillMaxSize()) {
@@ -125,65 +146,194 @@ fun SettingsScreen(onDismiss: () -> Unit) {
         Column(
           Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
         ) {
-          Text("OpenAI API 金鑰", style = MaterialTheme.typography.titleSmall,
+          Text("API 來源", style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-          OutlinedTextField(
-            value = apiKey,
-            onValueChange = settings::setApiKey,
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            placeholder = { Text("sk-…") },
-            modifier = Modifier.fillMaxWidth(),
-          )
+          val providerLabels = listOf("OpenAI 官方", "自訂")
+          val customSelected = apiProvider == SettingsStore.PROVIDER_CUSTOM
+          SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            providerLabels.forEachIndexed { index, label ->
+              SegmentedButton(
+                selected = customSelected == (index == 1),
+                onClick = {
+                  settings.setApiProvider(
+                    if (index == 1) SettingsStore.PROVIDER_CUSTOM else SettingsStore.PROVIDER_OPENAI)
+                },
+                shape = SegmentedButtonDefaults.itemShape(index, providerLabels.size),
+              ) { Text(label) }
+            }
+          }
           Text(
-            "金鑰儲存在此裝置。逐字稿與 AI 講義會使用你的 OpenAI 額度。",
+            "選擇 AI 逐字稿與講義要使用的伺服器。「自訂」可指向你自己（通常較便宜或本機）的 OpenAI 相容伺服器。兩組設定都會分別保存，可隨時切換。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
           )
 
-          Spacer(Modifier.height(16.dp))
-          Text("模型", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 4.dp))
-          ExposedDropdownMenuBox(
-            expanded = modelMenuExpanded,
-            onExpandedChange = { modelMenuExpanded = it },
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-          ) {
+          if (!customSelected) {
+            Spacer(Modifier.height(16.dp))
+            Text("OpenAI API 金鑰", style = MaterialTheme.typography.titleSmall,
+              modifier = Modifier.padding(bottom = 4.dp))
             OutlinedTextField(
-              value = transcriptionModel,
-              onValueChange = {},
-              readOnly = true,
+              value = apiKey,
+              onValueChange = settings::setApiKey,
               singleLine = true,
-              label = { Text("轉錄模型") },
-              trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelMenuExpanded) },
-              modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+              visualTransformation = PasswordVisualTransformation(),
+              placeholder = { Text("sk-…") },
+              modifier = Modifier.fillMaxWidth(),
             )
-            ExposedDropdownMenu(
+            Text(
+              "金鑰儲存在此裝置。逐字稿與 AI 講義會使用你的 OpenAI 額度。",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              modifier = Modifier.padding(top = 4.dp),
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Text("模型", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 4.dp))
+            ExposedDropdownMenuBox(
               expanded = modelMenuExpanded,
-              onDismissRequest = { modelMenuExpanded = false },
+              onExpandedChange = { modelMenuExpanded = it },
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             ) {
-              SettingsStore.TRANSCRIPTION_MODELS.forEach { model ->
-                DropdownMenuItem(
-                  text = { Text(model) },
-                  onClick = {
-                    settings.setTranscriptionModel(model)
-                    modelMenuExpanded = false
-                  },
-                )
+              OutlinedTextField(
+                value = transcriptionModel,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                label = { Text("轉錄模型") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelMenuExpanded) },
+                modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+              )
+              ExposedDropdownMenu(
+                expanded = modelMenuExpanded,
+                onDismissRequest = { modelMenuExpanded = false },
+              ) {
+                SettingsStore.TRANSCRIPTION_MODELS.forEach { model ->
+                  DropdownMenuItem(
+                    text = { Text(model) },
+                    onClick = {
+                      settings.setTranscriptionModel(model)
+                      modelMenuExpanded = false
+                    },
+                  )
+                }
               }
             }
+            OutlinedTextField(
+              value = chatModel,
+              onValueChange = settings::setChatModel,
+              singleLine = true,
+              label = { Text("講義模型") },
+              modifier = Modifier.fillMaxWidth(),
+            )
+            TextButton(onClick = {
+              settings.setTranscriptionModel(SettingsStore.DEFAULT_TRANSCRIPTION_MODEL)
+              settings.setChatModel(SettingsStore.DEFAULT_CHAT_MODEL)
+            }) { Text("恢復預設模型") }
+          } else {
+            Spacer(Modifier.height(16.dp))
+            Text("轉錄伺服器", style = MaterialTheme.typography.titleSmall,
+              modifier = Modifier.padding(bottom = 4.dp))
+            OutlinedTextField(
+              value = customTranscriptionUrl,
+              onValueChange = { settings.setCustomTranscriptionUrl(it); transcriptionProbe = ProbeState.Idle },
+              singleLine = true,
+              label = { Text("伺服器網址") },
+              placeholder = { Text(SettingsStore.DEFAULT_CUSTOM_SERVER_URL) },
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
+            OutlinedTextField(
+              value = customTranscriptionModel,
+              onValueChange = { settings.setCustomTranscriptionModel(it); transcriptionProbe = ProbeState.Idle },
+              singleLine = true,
+              label = { Text("轉錄模型") },
+              placeholder = { Text(SettingsStore.DEFAULT_TRANSCRIPTION_MODEL) },
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
+            OutlinedTextField(
+              value = customTranscriptionKey,
+              onValueChange = { settings.setCustomTranscriptionKey(it); transcriptionProbe = ProbeState.Idle },
+              singleLine = true,
+              visualTransformation = PasswordVisualTransformation(),
+              label = { Text("API 金鑰") },
+              placeholder = { Text(customKeyPlaceholder(customTranscriptionUrl)) },
+              modifier = Modifier.fillMaxWidth(),
+            )
+            VerifyRow("驗證轉錄伺服器", transcriptionProbe) {
+              transcriptionProbe = ProbeState.Checking
+              scope.launch {
+                transcriptionProbe = try {
+                  OpenAIService.verifyTranscription(settings.transcriptionConfig())
+                  ProbeState.Ok
+                } catch (e: Exception) {
+                  ProbeState.Failed(e.message ?: "驗證失敗")
+                }
+              }
+            }
+            Text(
+              "與 OpenAI 相容的伺服器網址（到 /v1 為止），用於 /audio/transcriptions。本機伺服器通常不需金鑰。",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Text("講義／翻譯伺服器", style = MaterialTheme.typography.titleSmall,
+              modifier = Modifier.padding(bottom = 4.dp))
+            OutlinedTextField(
+              value = customChatUrl,
+              onValueChange = { settings.setCustomChatUrl(it); chatProbe = ProbeState.Idle },
+              singleLine = true,
+              label = { Text("伺服器網址") },
+              placeholder = { Text(SettingsStore.DEFAULT_CUSTOM_SERVER_URL) },
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
+            OutlinedTextField(
+              value = customChatModel,
+              onValueChange = { settings.setCustomChatModel(it); chatProbe = ProbeState.Idle },
+              singleLine = true,
+              label = { Text("講義／翻譯模型") },
+              placeholder = { Text(SettingsStore.DEFAULT_CHAT_MODEL) },
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
+            OutlinedTextField(
+              value = customChatKey,
+              onValueChange = { settings.setCustomChatKey(it); chatProbe = ProbeState.Idle },
+              singleLine = true,
+              visualTransformation = PasswordVisualTransformation(),
+              label = { Text("API 金鑰") },
+              placeholder = { Text(customKeyPlaceholder(customChatUrl)) },
+              modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+              verticalAlignment = Alignment.CenterVertically,
+              modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            ) {
+              Text("停用思考模式（no think）", modifier = Modifier.weight(1f))
+              Switch(checked = customChatNoThink, onCheckedChange = {
+                settings.setCustomChatNoThink(it)
+                chatProbe = ProbeState.Idle
+              })
+            }
+            VerifyRow("驗證講義／翻譯伺服器", chatProbe) {
+              chatProbe = ProbeState.Checking
+              scope.launch {
+                chatProbe = try {
+                  OpenAIService.verifyChat(settings.chatConfig())
+                  ProbeState.Ok
+                } catch (e: Exception) {
+                  ProbeState.Failed(e.message ?: "驗證失敗")
+                }
+              }
+            }
+            Text(
+              "與 OpenAI 相容的伺服器網址（到 /v1 為止），用於 /chat/completions。講義、翻譯與句子斷句都會使用這個伺服器。\n" +
+                "本機 Ollama 的思考模型（qwen3、deepseek-r1 等）預設會輸出思考過程，開啟「停用思考模式」會傳送 reasoning_effort=none 將其關閉。",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
           }
-          OutlinedTextField(
-            value = chatModel,
-            onValueChange = settings::setChatModel,
-            singleLine = true,
-            label = { Text("講義模型") },
-            modifier = Modifier.fillMaxWidth(),
-          )
-          TextButton(onClick = {
-            settings.setTranscriptionModel(SettingsStore.DEFAULT_TRANSCRIPTION_MODEL)
-            settings.setChatModel(SettingsStore.DEFAULT_CHAT_MODEL)
-          }) { Text("恢復預設模型") }
 
           Spacer(Modifier.height(16.dp))
           Text("翻譯", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(bottom = 4.dp))
@@ -363,3 +513,43 @@ fun SettingsScreen(onDismiss: () -> Unit) {
     )
   }
 }
+
+/** Result of a custom-server verification probe. */
+private sealed interface ProbeState {
+  data object Idle : ProbeState
+  data object Checking : ProbeState
+  data object Ok : ProbeState
+  data class Failed(val message: String) : ProbeState
+}
+
+/** Tappable "verify this server" row with a trailing status: spinner while
+ *  checking, check on success, cross + the server's error text on failure.
+ *  Mirrors the iOS SettingsView verifyRow. */
+@Composable
+private fun VerifyRow(label: String, state: ProbeState, onVerify: () -> Unit) {
+  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+    TextButton(onClick = onVerify, enabled = state != ProbeState.Checking) { Text(label) }
+    Spacer(Modifier.weight(1f))
+    when (state) {
+      ProbeState.Checking -> CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+      ProbeState.Ok -> Icon(Icons.Filled.CheckCircle, contentDescription = "驗證成功",
+        tint = MaterialTheme.colorScheme.primary)
+      is ProbeState.Failed -> Icon(Icons.Filled.Cancel, contentDescription = "驗證失敗",
+        tint = MaterialTheme.colorScheme.error)
+      ProbeState.Idle -> {}
+    }
+  }
+  if (state is ProbeState.Failed) {
+    Text(
+      state.message,
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.error,
+    )
+  }
+}
+
+/** Key-field placeholder: while the URL still points at the official OpenAI
+ *  server a blank key falls back to the OpenAI-mode key; anywhere else a blank
+ *  key sends no key (local servers are typically keyless). */
+private fun customKeyPlaceholder(url: String): String =
+  if (SettingsStore.customUrlIsOfficial(url)) "與 OpenAI 模式相同（可留空）" else "API 金鑰（可留空）"

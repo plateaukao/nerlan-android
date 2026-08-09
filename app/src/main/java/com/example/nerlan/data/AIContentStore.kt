@@ -305,8 +305,7 @@ class AIContentStore(private val context: Context) {
         for ((i, chunk) in chunks.withIndex()) {
           setJob(k, JobState.Running(if (multi) "轉錄中…（${i + 1}/${chunks.size}）" else "轉錄中…"))
           val result = OpenAIService.transcribe(
-            chunk, settings.transcriptionModelOrDefault(), settings.apiKey.value,
-            prompt = prompt, language = locale)
+            chunk, settings.transcriptionConfig(), prompt = prompt, language = locale)
           // Each chunk is transcoded 0-based, so shift its timestamps onto the
           // absolute episode timeline by the chunk's start offset.
           val offset = i * AudioTranscoder.MAX_CHUNK_SECONDS.toDouble()
@@ -317,7 +316,7 @@ class AIContentStore(private val context: Context) {
           // transcription isn't lost. Then align its sentences to its own timestamps.
           setJob(k, JobState.Running(if (multi) "整理句子中…（${i + 1}/${chunks.size}）" else "整理句子中…"))
           val chunkText = runCatching {
-            OpenAIService.segmentTranscript(result.text, settings.chatModelOrDefault(), settings.apiKey.value)
+            OpenAIService.segmentTranscript(result.text, settings.chatConfig())
           }.getOrNull() ?: result.text
           val chunkSentences = displaySentences(chunkText)
           val chunkCues = alignCues(chunkSentences, chunkSegments)
@@ -377,7 +376,7 @@ class AIContentStore(private val context: Context) {
         val partTitle = if (segments.size > 1) partTitle(i, segments.size, record.durationSeconds) else null
         fragments += OpenAIService.generateHandout(
           transcript = segment, record = record, partTitle = partTitle,
-          model = settings.chatModelOrDefault(), apiKey = settings.apiKey.value)
+          config = settings.chatConfig())
       }
       handoutFile(record.id).writeText(fragments.joinToString("\n"))
       noteRecord(record)
@@ -404,7 +403,7 @@ class AIContentStore(private val context: Context) {
       // Publish each finished batch (~40 sentences) so the transcript screen fills
       // in top-down instead of waiting for the whole transcript.
       val translated = OpenAIService.translateSentences(
-        sentences, language, settings.chatModelOrDefault(), settings.apiKey.value,
+        sentences, language, settings.chatConfig(),
         onPartial = { soFar -> _partialTranslations.update { it + (id to StoredTranslation(language, soFar)) } })
       translationFile(id).writeText(json.encodeToString(StoredTranslation(language, translated)))
       noteRecord(record)

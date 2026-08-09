@@ -13,6 +13,7 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.provideContent
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Column
+import androidx.glance.layout.Row
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.text.FontWeight
@@ -39,38 +40,60 @@ class StatsWidget : GlanceAppWidget() {
         WidgetSurface {
           val size = LocalSize.current
           val innerHeight = size.height.value - 24f
-          val numberSp = when {
-            innerHeight >= 170f -> 56
-            innerHeight >= 120f -> 42
-            else -> 30
-          }
           val stats = model.stats
-          Column(
-            modifier = GlanceModifier.fillMaxSize().clickable(openTabAction("programs")),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            WidgetCaption("今日學習")
-            Text(
-              text = "${stats.minutesToday}",
-              style = TextStyle(
-                color = GlanceTheme.colors.onSurface,
-                fontSize = numberSp.sp,
-                fontWeight = FontWeight.Bold,
-              ),
-            )
-            WidgetCaption("分鐘")
-            ColSpacer(8)
-            // A progress hint against a 30-minute day, not a promise: nothing in
-            // the app lets the goal be configured.
-            WidgetProgressBar(
-              (stats.minutesToday / 30f).coerceIn(0f, 1f),
-              widthDp = (size.width.value - 28f).toInt(),
-              heightDp = if (innerHeight >= 170f) 6 else 4,
-            )
-            ColSpacer(6)
-            Column(modifier = GlanceModifier.fillMaxWidth()) {
-              WidgetCaption("連續 ${stats.streakDays} 天")
-              WidgetCaption("本週 ${formatMinutes(stats.minutesThisWeek)}")
+          if (innerHeight < 100f) {
+            // 2x1: the essentials on three tight lines — today's minutes and the
+            // streak; the week total joins the streak line when the width allows.
+            Column(
+              modifier = GlanceModifier.fillMaxSize().clickable(openTabAction("programs")),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              WidgetCaption("今日學習")
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                  text = "${stats.minutesToday}",
+                  style = TextStyle(
+                    color = GlanceTheme.colors.onSurface,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                  ),
+                )
+                RowSpacer(4)
+                WidgetCaption("分鐘")
+              }
+              WidgetCaption(
+                if (size.width.value >= 200f) {
+                  "連續 ${stats.streakDays} 天 · 本週 ${formatMinutes(stats.minutesThisWeek)}"
+                } else {
+                  "連續 ${stats.streakDays} 天"
+                },
+              )
+            }
+          } else {
+            val numberSp = when {
+              innerHeight >= 170f -> 56
+              innerHeight >= 120f -> 42
+              else -> 30
+            }
+            Column(
+              modifier = GlanceModifier.fillMaxSize().clickable(openTabAction("programs")),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              WidgetCaption("今日學習")
+              Text(
+                text = "${stats.minutesToday}",
+                style = TextStyle(
+                  color = GlanceTheme.colors.onSurface,
+                  fontSize = numberSp.sp,
+                  fontWeight = FontWeight.Bold,
+                ),
+              )
+              WidgetCaption("分鐘")
+              ColSpacer(8)
+              Column(modifier = GlanceModifier.fillMaxWidth()) {
+                WidgetCaption("連續 ${stats.streakDays} 天")
+                WidgetCaption("本週 ${formatMinutes(stats.minutesThisWeek)}")
+              }
             }
           }
         }

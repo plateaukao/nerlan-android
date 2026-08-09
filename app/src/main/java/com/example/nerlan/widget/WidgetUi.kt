@@ -166,7 +166,9 @@ fun WidgetEmptyState(message: String, onClick: Action) {
   }
 }
 
-/** Outer frame every widget shares: rounded surface, uniform padding. */
+/** Outer frame every widget shares: rounded surface, uniform padding, and a
+ *  small app badge in the top-end corner (tapping it opens the app) so the
+ *  widgets are recognizably NerLan's at a glance. */
 @Composable
 fun WidgetSurface(content: @Composable () -> Unit) {
   Box(
@@ -174,8 +176,16 @@ fun WidgetSurface(content: @Composable () -> Unit) {
       .fillMaxSize()
       .background(GlanceTheme.colors.widgetBackground)
       .cornerRadius(16.dp)
-      .padding(12.dp)
-  ) { content() }
+      .padding(12.dp),
+    contentAlignment = Alignment.TopEnd,
+  ) {
+    Box(modifier = GlanceModifier.fillMaxSize()) { content() }
+    Image(
+      provider = ImageProvider(R.mipmap.ic_launcher_round),
+      contentDescription = "NerLan",
+      modifier = GlanceModifier.size(16.dp).clickable(openTabAction("programs")),
+    )
+  }
 }
 
 @Composable

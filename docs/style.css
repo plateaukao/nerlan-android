@@ -322,8 +322,37 @@ pre code { background: none; border: none; color: inherit; padding: 0; }
   margin: 1rem 0;
 }
 
+/* Widget cards: screenshot + name + description, replacing a table whose
+   narrow first column wrapped the CJK widget names character by character. */
+.widget-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin: 1rem 0;
+}
+.widget-card {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.widget-card img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--faint);
+}
+.widget-card h3 {
+  margin: 0.7rem 0 0.3rem;
+  font-size: 1.05rem;
+  white-space: nowrap;
+}
+.widget-card p { margin: 0; color: var(--mid); font-size: 0.92rem; }
+
 /* Tables */
 .table-wrap { overflow-x: auto; }
+
+/* CJK labels used as row names must never wrap character-by-character. */
+td strong { white-space: nowrap; }
 
 table {
   border-collapse: separate;
@@ -426,4 +455,5 @@ th { background: var(--wash); }
 @media (max-width: 480px) {
   .features__grid, .gallery__grid { grid-template-columns: 1fr; }
   .device-img { width: 100%; }
+  .widget-list { grid-template-columns: 1fr; }
 }

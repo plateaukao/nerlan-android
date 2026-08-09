@@ -213,13 +213,28 @@
 <section id="widgets">
   <h2>Home-screen widgets</h2>
   <p>Four resizable widgets keep practice one tap away; their layouts adapt to the size you give them.</p>
-  <div class="table-wrap"><table>
-    <tr><th>Widget</th><th>Shows</th><th>Tap actions</th></tr>
-    <tr><td><strong>繼續收聽</strong></td><td>The playing episode with progress; larger sizes list what's next.</td><td>Transport buttons play/pause/skip; the cover opens the player.</td></tr>
-    <tr><td><strong>最近播放</strong></td><td>Shows you've been working through, with resume progress.</td><td>The play button resumes the whole course where you stopped.</td></tr>
-    <tr><td><strong>我的節目</strong></td><td>A cover grid of favorited programs and podcasts.</td><td>A cover opens that show. Configurable: pick and order exactly which shows appear, or leave it automatic.</td></tr>
-    <tr><td><strong>學習紀錄</strong></td><td>今日學習 minutes, a daily 30-minute goal bar, 連續 N 天 streak, and this week's total.</td><td>Opens the app.</td></tr>
-  </table></div>
+  <div class="widget-list">
+    <div class="widget-card">
+      <img src="images/widget-upnext.png" alt="繼續收聽 widget showing the playing episode with transport controls" loading="lazy">
+      <h3>繼續收聽</h3>
+      <p>The playing episode — cover, progress, and time remaining — with back-15s, play/pause, and next buttons right on the widget. Taller sizes add an 接下來 list of what plays next; with nothing loaded it offers your most recent download or favorite. Tapping the cover opens the player.</p>
+    </div>
+    <div class="widget-card">
+      <img src="images/widget-recent.png" alt="最近播放 widget listing recent shows with resume progress" loading="lazy">
+      <h3>最近播放</h3>
+      <p>The shows you've been working through, each with the episode you stopped at and its resume progress. The play button picks the whole course back up exactly there, with the rest queued behind it; tapping a row opens that show's episode list.</p>
+    </div>
+    <div class="widget-card">
+      <img src="images/widget-shows.png" alt="我的節目 widget with a grid of show covers" loading="lazy">
+      <h3>我的節目</h3>
+      <p>A cover grid of your favorited programs and subscribed podcasts — one tap opens the show. By default it orders by recent listening; edit the widget to hand-pick exactly which shows appear and in what order, and place several copies pinned to different sets.</p>
+    </div>
+    <div class="widget-card">
+      <img src="images/widget-stats.png" alt="學習紀錄 widget with today's minutes, streak and weekly total" loading="lazy">
+      <h3>學習紀錄</h3>
+      <p>Today's listening minutes against a 30-minute daily goal bar, your 連續 N 天 streak, and this week's total — the numbers merge across devices when Drive sync is on. Tapping it opens the app.</p>
+    </div>
+  </div>
 </section>
 
 <section id="sync">

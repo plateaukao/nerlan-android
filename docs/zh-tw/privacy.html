@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XQSZXV7E00"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-XQSZXV7E00');
+  </script>
+  <title>NerLan 隱私權政策</title>
+  <meta name="description" content="NerLan 不蒐集任何個人資料，沒有帳號、分析或廣告。說明 App 在裝置上保存什麼、以及什麼情況下資料會離開裝置（iOS 與 Android 皆適用）。">
+  <link rel="stylesheet" href="../style.css">
+  <script defer src="../lang-banner.js"></script>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="container">
+    <a href="index.html" class="site-nav__logo">NerLan<span class="dot">.</span></a>
+    <button class="nav-toggle" onclick="document.querySelector('.site-nav__links').classList.toggle('open')" aria-label="切換選單">&#9776;</button>
+    <ul class="site-nav__links">
+      <li><a href="guide.html">使用說明</a></li>
+      <li><a href="download.html">下載</a></li>
+      <li><a href="https://github.com/plateaukao/nerlan-android">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container guide-layout">
+
+<aside class="guide-sidebar">
+  <div class="toc-section">隱私權</div>
+  <ul>
+    <li><a href="#summary">簡短版本</a></li>
+    <li><a href="#ondevice">留在裝置上的資料</a></li>
+    <li><a href="#network">會離開裝置的資料</a></li>
+  </ul>
+  <div class="toc-section">細節</div>
+  <ul>
+    <li><a href="#ai">AI 功能</a></li>
+    <li><a href="#sync">同步與備份</a></li>
+    <li><a href="#mic">麥克風</a></li>
+    <li><a href="#localnet">區域網路</a></li>
+    <li><a href="#children">兒童</a></li>
+    <li><a href="#website">本網站</a></li>
+    <li><a href="#changes">變更與聯絡方式</a></li>
+  </ul>
+</aside>
+
+<main class="guide-main">
+
+<h1>隱私權政策</h1>
+<p><em>最後更新：2026 年 8 月 16 日。適用於 NerLan 的 iOS 與 Android App。</em></p>
+
+<h2 id="summary">簡短版本</h2>
+<p>NerLan 沒有帳號、不需註冊，沒有分析、沒有廣告、沒有追蹤，也沒有任何第三方
+SDK。開發者沒有架設任何伺服器，也不會從 App 收到任何資料——你的資訊沒有地方可
+以被送去，因為根本沒有後端。</p>
+
+<p>App 知道的一切都留在你的裝置上。資料只有在你自己啟動的情況下才會離開裝置：
+從節目自己的 feed 下載單集、使用你提供金鑰的 AI 功能，或開啟同步到你自己的雲端
+帳號。以下逐項說明。</p>
+
+<div class="note">
+<p><strong>不蒐集、不販售、不分享任何資料，也不會用於廣告或行為分析。</strong>
+開發者無從得知你聽了什麼、學了什麼，甚至無從得知你有沒有在使用這個 App。</p>
+</div>
+
+<h2 id="ondevice">留在裝置上的資料</h2>
+<p>以下全部儲存在 App 的私有儲存空間，刪除 App 時一併移除：</p>
+<ul>
+  <li>你的訂閱、收藏與每一集的註記</li>
+  <li>已下載與已快取的音檔，以及下載的講義附件</li>
+  <li>播放位置、播放速度與重複設定</li>
+  <li>收聽統計（收聽時間、完成單集數、連續天數）</li>
+  <li>已產生的 AI 逐字稿、講義與翻譯</li>
+  <li>你的 API 金鑰，存放在系統鑰匙圈／加密儲存空間中</li>
+</ul>
+<p>除非你開啟下方的選用功能，否則這些資料不會傳送到任何地方。</p>
+
+<h2 id="network">會離開裝置的資料</h2>
+<p>App 只在三種情況下連線，而且都由你主動觸發：</p>
+<ul>
+  <li><strong>取得節目與音訊。</strong>當你訂閱 Podcast，或播放、串流、下載單集
+  時，App 會直接向發布該節目的 feed 或音訊服務請求內容。那些服務收到的請求與任
+  何 Podcast App 相同——通常是 IP 位址與標準的 HTTP user agent。它們與 NerLan
+  無關，並依其各自的隱私權政策處理這些資料。</li>
+  <li><strong>AI 功能</strong>——見下方說明。除非你設定金鑰或伺服器，否則不會啟用。</li>
+  <li><strong>同步</strong>——見下方說明。預設關閉。</li>
+</ul>
+
+<h2 id="ai">AI 功能</h2>
+<p>逐字稿、AI 講義與翻譯都是選用功能，在你輸入自己的憑證之前不會運作。供應方由
+你選擇：</p>
+<ul>
+  <li><strong>OpenAI</strong>，使用你自己提供並自行付費的 API 金鑰。單集音訊會上
+  傳以進行轉錄，逐字稿文字會傳送以產生講義與翻譯。該處理適用
+  <a href="https://openai.com/policies/privacy-policy">OpenAI 的隱私權政策</a>，
+  費用記在你自己的帳號。NerLan 與 OpenAI 無隸屬關係。</li>
+  <li><strong>你自己的伺服器</strong>——任何 OpenAI 相容的端點，包括架在你自己電
+  腦或區域網路上的。此時音訊與文字只會送到你指定的位置，不涉及任何第三方。</li>
+</ul>
+<p>你的 API 金鑰儲存在裝置的鑰匙圈（iOS）或加密偏好設定（Android）中，只會傳送
+到你設定的端點，絕不會傳給開發者。</p>
+
+<h2 id="sync">同步與備份</h2>
+<p>同步預設關閉，而且每個選項都寫入<em>你自己的</em>雲端帳號，不會寫入開發者的任
+何伺服器：</p>
+<ul>
+  <li><strong>iCloud</strong>（iOS）。將收藏、註記、收聽統計、訂閱、逐字稿與講義
+  備份到你自己的 iCloud 帳號，重新安裝後可復原，也會同步到你的其他裝置。適用
+  Apple 的隱私權政策。音檔永遠不會同步。</li>
+  <li><strong>Google 雲端硬碟。</strong>在有提供此功能時，會登入你自己的 Google
+  帳號，並寫入 App 專屬的隱藏應用程式資料夾，其他 App 無法讀取。它只用來在 iOS
+  與 Android 版之間搬移你自己的資料。開發者無權存取，App 也不會要求其他 Drive
+  權限範圍。登出即撤銷授權。</li>
+</ul>
+
+<h2 id="mic">麥克風</h2>
+<p>跟讀練習會錄下你朗讀句子的聲音，讓你和原音對照播放。錄音寫入裝置上 App 的私
+有儲存空間，不會上傳也不會同步，並會被下一次錄音覆蓋。權限只在你第一次使用該功
+能時才會要求，其他時候 App 不會錄音。</p>
+
+<h2 id="localnet">區域網路</h2>
+<p>若你選擇搜尋自架的轉錄伺服器，App 只會在區域網路上瀏覽該一種服務類型，用來
+自動填入伺服器位址。它不會掃描其他任何東西，也不會回報任何資訊。</p>
+
+<h2 id="children">兒童</h2>
+<p>NerLan 並非以兒童為對象，且不會蒐集任何人的個人資訊，包括 13 歲以下兒童。</p>
+
+<h2 id="website">本網站</h2>
+<p>本網站以 GitHub Pages 代管，並使用 Google Analytics 計算瀏覽次數。這只適用於
+網站本身——App 內不含任何分析工具。GitHub 與 Google 可能依其各自政策記錄對本網站
+的請求。</p>
+
+<h2 id="changes">變更與聯絡方式</h2>
+<p>本政策如有變更，將於此處張貼更新版本並標註新日期。有任何問題，歡迎到
+<a href="https://github.com/plateaukao/nerlan-android">GitHub</a> 開 issue。</p>
+
+</main>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    NerLan 是開放原始碼軟體。節目內容來自各自的 feed，版權均屬原發布者所有。
+    <br><a href="privacy.html">隱私權政策</a>
+  </div>
+</footer>
+
+</body>
+</html>

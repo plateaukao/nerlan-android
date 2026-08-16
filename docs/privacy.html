@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XQSZXV7E00"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-XQSZXV7E00');
+  </script>
+  <title>NerLan Privacy Policy</title>
+  <meta name="description" content="NerLan collects no personal data and has no accounts, analytics, or advertising. What the app stores, and what it sends where — for both the iOS and Android apps.">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="lang-banner.js"></script>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="container">
+    <a href="index.html" class="site-nav__logo">NerLan<span class="dot">.</span></a>
+    <button class="nav-toggle" onclick="document.querySelector('.site-nav__links').classList.toggle('open')" aria-label="Toggle navigation">&#9776;</button>
+    <ul class="site-nav__links">
+      <li><a href="guide.html">User Guide</a></li>
+      <li><a href="download.html">Download</a></li>
+      <li><a href="https://github.com/plateaukao/nerlan-android">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="container guide-layout">
+
+<aside class="guide-sidebar">
+  <div class="toc-section">Privacy</div>
+  <ul>
+    <li><a href="#summary">The short version</a></li>
+    <li><a href="#ondevice">What stays on your device</a></li>
+    <li><a href="#network">What leaves your device</a></li>
+  </ul>
+  <div class="toc-section">Details</div>
+  <ul>
+    <li><a href="#ai">AI features</a></li>
+    <li><a href="#sync">Sync and backup</a></li>
+    <li><a href="#mic">Microphone</a></li>
+    <li><a href="#localnet">Local network</a></li>
+    <li><a href="#children">Children</a></li>
+    <li><a href="#website">This website</a></li>
+    <li><a href="#changes">Changes and contact</a></li>
+  </ul>
+</aside>
+
+<main class="guide-main">
+
+<h1>Privacy Policy</h1>
+<p><em>Last updated: 16 August 2026. Applies to the NerLan apps for iOS and Android.</em></p>
+
+<h2 id="summary">The short version</h2>
+<p>NerLan has no accounts, no sign-up, no analytics, no advertising, no tracking
+and no third-party SDKs of any kind. The developer operates no server and
+receives no data from the app whatsoever — there is nowhere for your information
+to be sent to, because there is no back end.</p>
+
+<p>Everything the app knows about you lives on your device. The only times data
+leaves it are ones you start yourself: downloading an episode from the show's own
+feed, using an AI feature with a key you supplied, or turning on sync to your own
+cloud account. Each of those is described below.</p>
+
+<div class="note">
+<p><strong>No data is collected, sold, shared, or used for advertising or
+profiling — ever.</strong> The developer cannot see what you listen to, what you
+study, or that you use the app at all.</p>
+</div>
+
+<h2 id="ondevice">What stays on your device</h2>
+<p>All of this is stored locally in the app's private storage, and is deleted
+when you delete the app:</p>
+<ul>
+  <li>Your subscriptions, favorites, and per-episode notes</li>
+  <li>Downloaded and cached audio, and any downloaded handout attachments</li>
+  <li>Playback positions, playback speed, and repeat settings</li>
+  <li>Listening statistics (time listened, episodes finished, streaks)</li>
+  <li>AI transcripts, handouts, and translations once generated</li>
+  <li>Your API key, held in the system keychain / encrypted storage</li>
+</ul>
+<p>None of it is transmitted anywhere unless you switch on one of the optional
+features below.</p>
+
+<h2 id="network">What leaves your device</h2>
+<p>The app makes network requests in exactly three situations, all of them
+user-initiated:</p>
+<ul>
+  <li><strong>Fetching shows and audio.</strong> When you subscribe to a podcast
+  or play, stream, or download an episode, the app requests it directly from the
+  feed or audio service that publishes it. Those services receive the request as
+  any podcast app's would — typically an IP address and a standard HTTP user
+  agent. They are independent of NerLan and govern that data under their own
+  privacy policies.</li>
+  <li><strong>AI features</strong> — see below. Off unless you configure a key or
+  server.</li>
+  <li><strong>Sync</strong> — see below. Off by default.</li>
+</ul>
+
+<h2 id="ai">AI features</h2>
+<p>Transcripts, study handouts, and translation are optional and inactive until
+you enter your own credentials. You choose the provider:</p>
+<ul>
+  <li><strong>OpenAI</strong>, using an API key you supply and pay for. Episode
+  audio is uploaded for transcription, and transcript text is sent for handouts
+  and translation. That processing is governed by
+  <a href="https://openai.com/policies/privacy-policy">OpenAI's privacy
+  policy</a> and billed to your own account. NerLan is not affiliated with
+  OpenAI.</li>
+  <li><strong>Your own server</strong> — any OpenAI-compatible endpoint, including
+  one on your own machine or local network. In that case the audio and text go
+  only where you point them, and no third party is involved.</li>
+</ul>
+<p>Your API key is stored in the device keychain (iOS) or encrypted preferences
+(Android). It is sent only to the endpoint you configured, and never to the
+developer.</p>
+
+<h2 id="sync">Sync and backup</h2>
+<p>Sync is off by default, and every option writes to <em>your</em> cloud account,
+never to a server run by the developer:</p>
+<ul>
+  <li><strong>iCloud</strong> (iOS). Mirrors favorites, notes, listening stats,
+  subscriptions, transcripts, and handouts to your own iCloud account so they
+  survive a reinstall and reach your other devices. Governed by Apple's privacy
+  policy. Audio files are never synced.</li>
+  <li><strong>Google Drive.</strong> Where offered, this signs in to your own
+  Google account and writes to the app's hidden application-data folder, which
+  no other app can read. It is used only to move your own library between the
+  iOS and Android apps. The developer has no access to it, and the app requests
+  no other Drive scope. Signing out revokes the app's access.</li>
+</ul>
+
+<h2 id="mic">Microphone</h2>
+<p>Shadowing practice records you reading a sentence aloud so you can play it
+back against the original. Recordings are written to the app's private storage
+on your device, are never uploaded or synced, and are overwritten by the next
+recording. The permission is requested only when you first use the feature, and
+the app does not record at any other time.</p>
+
+<h2 id="localnet">Local network</h2>
+<p>If you choose to search for a self-hosted transcription server, the app
+browses the local network for that service type only, to fill in the server
+address for you. It does not scan for anything else and reports nothing.</p>
+
+<h2 id="children">Children</h2>
+<p>NerLan is not directed at children and collects no personal information from
+anyone, including children under 13.</p>
+
+<h2 id="website">This website</h2>
+<p>This site is hosted on GitHub Pages and uses Google Analytics to count page
+views. That applies to the website only — the apps contain no analytics. GitHub
+and Google may log requests to this site under their own policies.</p>
+
+<h2 id="changes">Changes and contact</h2>
+<p>If this policy changes, the updated version will be posted here with a new
+date. Questions can be raised as an issue on
+<a href="https://github.com/plateaukao/nerlan-android">GitHub</a>.</p>
+
+</main>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    NerLan is open source. It plays podcasts from their own feeds; all audio content belongs to its publishers.
+    <br><a href="privacy.html">Privacy Policy</a>
+  </div>
+</footer>
+
+</body>
+</html>

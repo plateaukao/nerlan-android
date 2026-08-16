@@ -214,6 +214,87 @@ pre code { background: none; border: none; color: inherit; padding: 0; }
 .feature-card h3 { margin: 0.7rem 0 0.4rem; font-size: 1.05rem; }
 .feature-card p { margin: 0; color: var(--mid); font-size: 0.92rem; }
 
+/* ---------- Naming ("Why NerLan?") ---------- */
+
+.naming {
+  background: var(--wash);
+  border-bottom: 1px solid var(--faint);
+  padding: 3.5rem 0;
+}
+
+.naming h2 { font-size: 1.8rem; margin: 0 0 0.3rem; }
+
+.naming__lede {
+  color: var(--mid);
+  margin: 0 0 2rem;
+  font-size: 1.05rem;
+}
+
+.naming__readings {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 2.5rem;
+}
+
+.reading {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  padding: 1.3rem 1.4rem;
+}
+.reading__k {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0.1rem 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.reading p { margin: 0; color: var(--mid); font-size: 0.95rem; }
+.reading strong { color: var(--ink); }
+.reading em { color: var(--warm); font-style: normal; font-weight: 700; }
+
+/* The five letters of LEARN, each linking to its section of the guide. */
+.learn-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  counter-reset: none;
+}
+.learn-strip a {
+  display: grid;
+  grid-template-columns: 3rem 8.5rem 1fr;
+  align-items: baseline;
+  gap: 1rem;
+  text-decoration: none;
+  color: var(--ink);
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.learn-strip a:hover {
+  background: var(--paper);
+  border-color: var(--hairline);
+}
+.learn-strip__letter {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--warm);
+  text-align: center;
+}
+.learn-strip__name { font-weight: 700; }
+.learn-strip__desc { color: var(--mid); font-size: 0.95rem; }
+
 /* ---------- Gallery ---------- */
 
 .gallery { padding: 0 0 4.5rem; }
@@ -417,6 +498,7 @@ th { background: var(--wash); }
 
 @media (max-width: 900px) {
   .features__grid, .gallery__grid { grid-template-columns: repeat(2, 1fr); }
+  .naming__readings { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 768px) {
@@ -454,6 +536,9 @@ th { background: var(--wash); }
 
 @media (max-width: 480px) {
   .features__grid, .gallery__grid { grid-template-columns: 1fr; }
+  /* Letter stays in its own column; name and description stack beside it. */
+  .learn-strip a { grid-template-columns: 2.2rem 1fr; gap: 0.25rem 0.8rem; }
+  .learn-strip__letter { grid-row: span 2; align-self: center; }
   .device-img { width: 100%; }
   .widget-list { grid-template-columns: 1fr; }
 }

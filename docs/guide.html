@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NerLan User Guide</title>
-  <meta name="description" content="Everything in NerLan: browsing courses, the player, AI transcripts and handouts, translation, shadowing, downloads, widgets, sync, and settings.">
+  <meta name="description" content="Everything in NerLan: browsing shows, the player, AI transcripts and handouts, translation, shadowing, downloads, widgets, sync, and settings.">
   <link rel="stylesheet" href="style.css">
   <script defer src="lang-banner.js"></script>
 </head>
@@ -65,16 +65,16 @@
 
 <section id="overview">
   <h2>Overview</h2>
-  <p>NerLan is a listening-first language study app. It streams the language-learning courses of Taiwan's National Education Radio (國立教育廣播電臺, "NER") — Japanese, Korean, English, French, and many more — and any podcast you add. On top of ordinary playback it layers study tools: AI-generated transcripts that follow the audio sentence by sentence, review handouts, line-by-line translation, and shadowing practice with your own voice recordings.</p>
-  <p>The interface is in Traditional Chinese, matching the courses' teaching language. This guide gives every label in the app alongside an English explanation.</p>
-  <p>To start: open the <strong>節目</strong> (Programs) tab, pick a language chip, open a course, and tap an episode. Everything else — downloading, transcripts, handouts — is one more tap from there.</p>
+  <p>NerLan is a listening-first language study app. It plays any podcast you add — Japanese, Korean, English, French, whatever you're learning — and on top of ordinary playback it layers study tools: AI-generated transcripts that follow the audio sentence by sentence, review handouts, line-by-line translation, and shadowing practice with your own voice recordings.</p>
+  <p>The interface is in Traditional Chinese. This guide gives every label in the app alongside an English explanation.</p>
+  <p>To start: open the <strong>節目</strong> (Programs) tab, pick a language chip, open a show, and tap an episode. Everything else — downloading, transcripts, handouts — is one more tap from there.</p>
 </section>
 
 <section id="interface">
   <h2>The four tabs</h2>
   <div class="table-wrap"><table>
     <tr><th>Tab</th><th>What it holds</th></tr>
-    <tr><td><strong>節目</strong> (Programs)</td><td>The NER course catalog and your podcasts, with language filters, plus the settings gear.</td></tr>
+    <tr><td><strong>節目</strong> (Programs)</td><td>Your shows, with language filters, plus the settings gear.</td></tr>
     <tr><td><strong>收藏</strong> (Favorites)</td><td>Programs and episodes you've hearted, grouped by show.</td></tr>
     <tr><td><strong>下載</strong> (Downloads)</td><td>Episodes stored offline — explicit downloads and auto-cached streams.</td></tr>
     <tr><td><strong>AI</strong></td><td>Every episode that has a generated transcript or handout — your study library.</td></tr>
@@ -86,8 +86,8 @@
 <section id="programs">
   <h2>Browsing programs</h2>
   <img class="device-img" src="images/programs.png" alt="Program list filtered to Japanese">
-  <p>The <strong>節目</strong> tab lists the whole NER catalog, grouped by language. A row of filter chips sits at the top; the most-studied languages (英語, 日語, 韓語, 法語) come first, and the chevron (<strong>展開語言</strong>) expands the row to show every language. Your chosen filter is remembered across launches; <strong>全部</strong> shows everything.</p>
-  <p>Each program row shows its cover, name, level (e.g. 初階), and episode count (<strong>共 N 集</strong>). Tap one to open its page:</p>
+  <p>The <strong>節目</strong> tab lists your shows, grouped by language. A row of filter chips sits at the top; the most-studied languages (英語, 日語, 韓語, 法語) come first, and the chevron (<strong>展開語言</strong>) expands the row to show every language. Your chosen filter is remembered across launches; <strong>全部</strong> shows everything.</p>
+  <p>Each show row shows its cover, name, level (e.g. 初階) where one is published, and episode count (<strong>共 N 集</strong>). Tap one to open its page:</p>
   <img class="device-img" src="images/program-detail.png" alt="Program page">
   <ul>
     <li>The heart in the top bar (<strong>收藏節目</strong>) favorites the whole program — it then appears in 收藏 and in the 我的節目 widget.</li>
@@ -102,7 +102,7 @@
   <h2>Adding podcasts</h2>
   <img class="device-img" src="images/podcast.png" alt="Program list with a subscribed Korean podcast under 我的 Podcast">
   <p>The <strong>＋</strong> button in the 節目 tab header opens <strong>新增 Podcast</strong>. Paste either an Apple Podcasts link (podcasts.apple.com or an apple.co short link) or a raw RSS feed URL — the dialog offers a shortcut, <strong>到 Apple Podcasts 搜尋節目</strong>, to search shows in your browser and copy the link back.</p>
-  <p>Subscribed shows appear under <strong>我的 Podcast</strong> at the top of the 節目 tab (when no language filter is active). Long-press a podcast row to <strong>取消訂閱</strong> (unsubscribe). Podcast episode pages work like course pages: pull to refresh for new episodes, hearts, and downloads.</p>
+  <p>Subscribed shows appear under <strong>我的 Podcast</strong> at the top of the 節目 tab (when no language filter is active). Long-press a podcast row to <strong>取消訂閱</strong> (unsubscribe). Podcast episode pages work like any other show page: pull to refresh for new episodes, hearts, and downloads.</p>
 </section>
 
 <section id="player">
@@ -124,7 +124,7 @@
   <img class="device-img" src="images/downloads.png" alt="Downloads tab">
   <p>Tapping <strong>下載</strong> on any episode saves its audio for offline listening — and automatically saves the episode's PDF handouts along with it. Up to three downloads run at once; progress shows as a ring on the row.</p>
   <p>Separately, <strong>串流快取</strong> (streaming cache, off by default — see <a href="#settings">Settings</a>) keeps the bytes you stream: an episode played to the end becomes fully cached and playable offline, capped at 2&nbsp;GB with least-recently-used eviction.</p>
-  <p>The <strong>下載</strong> tab shows both kinds side by side, sorted in course order:</p>
+  <p>The <strong>下載</strong> tab shows both kinds side by side, sorted in episode order:</p>
   <ul>
     <li>A <strong>filled check badge = 已下載</strong> (explicit download); an <strong>outlined, dimmed check = 快取</strong> (cache capture). The fill — not just the color — tells them apart, so it reads on e-ink screens too.</li>
     <li>The filter icon (<strong>篩選</strong>) narrows to 全部 / 已下載 / 快取; the segmented control groups by <strong>節目</strong> (program) or <strong>語言</strong> (language).</li>
@@ -194,20 +194,20 @@
 
 <section id="pdf">
   <h2>PDF handouts (講義)</h2>
-  <p>Some NER episodes come with official PDF handouts. Those episodes show a <strong>講義</strong> button (an ⓘ icon) — outlined if the PDF hasn't been saved yet, filled once it's offline. It opens a full-screen reader that keeps the audio playing; episodes with several attachments get a <strong>選擇附件</strong> switcher. PDFs download automatically alongside the episode's audio.</p>
+  <p>Some episodes come with official PDF handouts published alongside the audio. Those episodes show a <strong>講義</strong> button (an ⓘ icon) — outlined if the PDF hasn't been saved yet, filled once it's offline. It opens a full-screen reader that keeps the audio playing; episodes with several attachments get a <strong>選擇附件</strong> switcher. PDFs download automatically alongside the episode's audio.</p>
 </section>
 
 <section id="ai-tab">
   <h2>The AI library</h2>
   <img class="device-img" src="images/ai-tab.png" alt="AI tab listing episodes with transcripts and handouts">
-  <p>The <strong>AI</strong> tab lists every episode that has a transcript or handout, grouped by 節目 or 語言 — your generated study material in one place, in course order. Content here opens even with no AI configured, so material generated earlier (or synced from another device) is always readable.</p>
+  <p>The <strong>AI</strong> tab lists every episode that has a transcript or handout, grouped by 節目 or 語言 — your generated study material in one place, in episode order. Content here opens even with no AI configured, so material generated earlier (or synced from another device) is always readable.</p>
 </section>
 
 <section id="favorites-notes">
   <h2>Favorites &amp; episode notes</h2>
   <img class="device-img" src="images/favorites.png" alt="Favorites tab">
   <p>Hearts work on two levels: <strong>episodes</strong> (heart on any row or in the player) and whole <strong>programs</strong> (heart on the program page). Both collect in the 收藏 tab; swipe an episode right-to-left there to remove it.</p>
-  <p><strong>Notes:</strong> NER episode titles are often just "EP12", so you can attach a note to any episode — <strong>long-press</strong> a row anywhere (or swipe right-to-left in a program's episode list) to open the editor. The note appears as an extra line under the episode title in every list, and syncs with your other study material.</p>
+  <p><strong>Notes:</strong> episode titles are often just "EP12", so you can attach a note to any episode — <strong>long-press</strong> a row anywhere (or swipe right-to-left in a program's episode list) to open the editor. The note appears as an extra line under the episode title in every list, and syncs with your other study material.</p>
 </section>
 
 <section id="widgets">
@@ -222,7 +222,7 @@
     <div class="widget-card">
       <img src="images/widget-recent.png" alt="最近播放 widget listing recent shows with resume progress" loading="lazy">
       <h3>最近播放</h3>
-      <p>The shows you've been working through, each with the episode you stopped at and its resume progress. The play button picks the whole course back up exactly there, with the rest queued behind it; tapping a row opens that show's episode list.</p>
+      <p>The shows you've been working through, each with the episode you stopped at and its resume progress. The play button picks the whole show back up exactly there, with the rest queued behind it; tapping a row opens that show's episode list.</p>
     </div>
     <div class="widget-card">
       <img src="images/widget-shows.png" alt="我的節目 widget with a grid of show covers" loading="lazy">
@@ -277,7 +277,7 @@
 
 <footer class="site-footer">
   <div class="container">
-    NerLan is open source. Course content is provided by 國立教育廣播電臺 (National Education Radio); podcasts come from their own feeds.
+    NerLan is open source. It plays podcasts from their own feeds; all audio content belongs to its publishers.
   </div>
 </footer>
 

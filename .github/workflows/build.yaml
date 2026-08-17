@@ -1,5 +1,22 @@
+# Every push/PR: run unit tests and build a signed release APK, uploaded as a
+# workflow artifact. On top of that, a push to main publishes a pre-release with
+# the APK attached — fixed tag "pre-release", so there is only ever one: each
+# build deletes the old release+tag and recreates it (same scheme as
+# ohmybias-android). Signing uses the same keystore as the tagged vX.Y releases
+# (KEYSTORE/ALIAS/PASSWORD secrets), so pre-release builds install over them.
 name: Build
 on: [pull_request, push]
+
+# Needed to create the pre-release and delete its tag.
+permissions:
+  contents: write
+
+# Keep only the newest run per ref — a second push should not race the first one
+# to replace the pre-release tag. Grouping by ref keeps PRs and main independent.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,9 +34,36 @@ jobs:
         # ignore whitespace/non-alphabet bytes in the base64-encoded secret.
         run: echo "${{ secrets.KEYSTORE }}" | tr -d '[:space:]' | base64 -di > "$RUNNER_TEMP/android_keystore.keystore"
       - name: Build the app
-        run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file=$RUNNER_TEMP/android_keystore.keystore -Pandroid.injected.signing.store.password=${{ secrets.PASSWORD }} -Pandroid.injected.signing.key.alias=${{ secrets.ALIAS }} -Pandroid.injected.signing.key.password=${{ secrets.PASSWORD }}
+        run: ./gradlew testDebugUnitTest assembleRelease -Pandroid.injected.signing.store.file=$RUNNER_TEMP/android_keystore.keystore -Pandroid.injected.signing.store.password=${{ secrets.PASSWORD }} -Pandroid.injected.signing.key.alias=${{ secrets.ALIAS }} -Pandroid.injected.signing.key.password=${{ secrets.PASSWORD }}
       - name: Upload release APK
         uses: actions/upload-artifact@v7
         with:
           name: app-release.apk
           path: app/build/outputs/apk/release/app-release.apk
+
+      # Everything below only runs for pushes to main — tag pushes (vX.Y) and PR
+      # builds stop at the artifact above and leave the real releases alone.
+      - name: Name the pre-release APK
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: meta
+        run: |
+          VERSION=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | cut -d'"' -f2)
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          APK="NerLan-v${VERSION}-pre.${GITHUB_RUN_NUMBER}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "${APK}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "apk=${APK}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish pre-release (delete + recreate — only ever one)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          gh release delete pre-release --cleanup-tag -y || true
+          gh release create pre-release "${{ steps.meta.outputs.apk }}" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "NerLan v${{ steps.meta.outputs.version }} pre.${GITHUB_RUN_NUMBER} (${{ steps.meta.outputs.short_sha }})" \
+            --notes "$(printf 'Automatic pre-release build — %s\n\nSigned with the same key as the tagged releases, so it installs over an existing NerLan.\n\ncommit: %s' "$COMMIT_MSG" "$GITHUB_SHA")"

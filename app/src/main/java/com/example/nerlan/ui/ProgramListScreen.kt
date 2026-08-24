@@ -114,20 +114,28 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (Podcas
     }
   }
 
-  // Drop a restored filter that no longer matches any catalog language,
-  // which would otherwise leave the list permanently empty.
-  LaunchedEffect(groups) {
+  // Drop a restored filter that no longer matches any catalog or podcast
+  // language, which would otherwise leave the list permanently empty.
+  LaunchedEffect(groups, feeds) {
     val stored = settings.programLanguageFilter.value
-    if (groups.isNotEmpty() && stored.isNotEmpty() && groups.none { it.language == stored }) {
+    if (groups.isNotEmpty() && stored.isNotEmpty() &&
+      groups.none { it.language == stored } && feeds.none { it.language == stored }
+    ) {
       settings.setProgramLanguageFilter("")
     }
   }
 
-  val languages = remember(groups) {
-    val all = groups.map { it.language }
+  // Chips cover both the NER catalog and subscribed podcasts, so a podcast-only
+  // language (e.g. a show whose feed declares a language NER doesn't teach) is
+  // still filterable.
+  val languages = remember(groups, feeds) {
+    val all = (groups.map { it.language } + feeds.map { it.language }).distinct()
     PRIORITY_LANGUAGES.filter { it in all } + all.filterNot { it in PRIORITY_LANGUAGES }
   }
   val visibleGroups = selectedLanguage?.let { sel -> groups.filter { it.language == sel } } ?: groups
+  // Podcasts matching the selected language (all of them when unfiltered),
+  // pinned above the NER catalog.
+  val visibleFeeds = selectedLanguage?.let { sel -> feeds.filter { it.language == sel } } ?: feeds
 
   PullToRefreshBox(
     isRefreshing = isRefreshing,
@@ -201,9 +209,9 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (Podcas
             }
           }
         }
-        // Subscribed podcasts pinned above the NER catalog, in the unfiltered
-        // ("全部") view only so a language filter stays clean.
-        if (selectedLanguage == null && feeds.isNotEmpty()) {
+        // Subscribed podcasts pinned above the NER catalog; a language filter
+        // keeps the ones in that language.
+        if (visibleFeeds.isNotEmpty()) {
           item(key = "podcast-header") {
             Text(
               "我的 Podcast",
@@ -212,11 +220,11 @@ fun ProgramListScreen(onProgramClick: (Program) -> Unit, onPodcastClick: (Podcas
               modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp),
             )
           }
-          items(feeds.size, key = { "podcast-${feeds[it].id}" }) { i ->
+          items(visibleFeeds.size, key = { "podcast-${visibleFeeds[it].id}" }) { i ->
             PodcastRow(
-              feeds[i],
-              onClick = { onPodcastClick(feeds[i]) },
-              onUnsubscribe = { podcasts.unsubscribe(feeds[i].id) },
+              visibleFeeds[i],
+              onClick = { onPodcastClick(visibleFeeds[i]) },
+              onUnsubscribe = { podcasts.unsubscribe(visibleFeeds[i].id) },
             )
           }
         }

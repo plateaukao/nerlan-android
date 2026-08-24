@@ -130,7 +130,21 @@ fun PlayerSheet(onDismiss: () -> Unit) {
           )
         }
       } else if (!compactHeight) {
-        CoverImage(record.coverUrl, 200.dp)
+        // For a podcast episode the cover is a link to the show's episode list
+        // (its programId is the subscribed feed's id). NER covers stay inert.
+        val isPodcastShow = remember(record.programId) {
+          NerLanApp.instance.podcasts.feed(record.programId) != null
+        }
+        CoverImage(
+          record.coverUrl,
+          200.dp,
+          modifier = if (isPodcastShow) {
+            Modifier.clickable {
+              DeepLinkRouter.openShow(record.programId, isPodcast = true)
+              onDismiss()
+            }
+          } else Modifier,
+        )
         Text(
           record.title,
           style = MaterialTheme.typography.titleMedium,

@@ -30,8 +30,7 @@ object DeepLinkRouter {
       "player" -> _openPlayer.value += 1
       "show" -> {
         val id = uri.getQueryParameter("id") ?: return
-        _tab.value = 0
-        _pendingShow.value = id to (uri.getQueryParameter("podcast") == "1")
+        openShow(id, isPodcast = uri.getQueryParameter("podcast") == "1")
       }
       "tab" -> _tab.value = when (uri.getQueryParameter("name")) {
         "favorites" -> 1
@@ -40,6 +39,13 @@ object DeepLinkRouter {
         else -> 0
       }
     }
+  }
+
+  /** Programmatic show request from inside the app (e.g. tapping the player
+   *  sheet's cover) — the same one-shot flow the widget URIs use. */
+  fun openShow(id: String, isPodcast: Boolean) {
+    _tab.value = 0
+    _pendingShow.value = id to isPodcast
   }
 
   fun consumeTab() { _tab.value = null }

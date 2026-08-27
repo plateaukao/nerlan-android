@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -282,11 +283,13 @@ class AIContentStore(private val context: Context) {
     return try {
       val source = audioFile(record) ?: throw Exception("找不到音訊檔")
       setJob(k, JobState.Running("轉錄中…"))
-      // Long episodes are split into ~20-min chunks (the gpt-4o-transcribe models
-      // cap input at 1400 s). Each chunk is transcribed, re-segmented and aligned on
-      // its own, then appended and published — so the viewer can show the first
-      // chunk while later chunks are still transcribing, rather than waiting for the
-      // whole episode.
+      // Long episodes are split into 5-min chunks (the gpt-4o-transcribe models cap
+      // input at 1400 s anyway). Each chunk is transcribed, re-segmented and aligned
+      // on its own, then appended and published — so the viewer shows the first
+      // chunk while later chunks are still in flight, rather than waiting for the
+      // whole episode. The transcoder is a flow collected with buffer(), so it runs
+      // ahead in its own coroutine: chunk n+1 is transcoded (CPU/codec) while chunk
+      // n is uploading and transcribing (network) — the two never wait on each other.
       val chunks = AudioTranscoder.transcodeChunks(context, record.id, Uri.fromFile(source), source)
       // A monolingual source (a podcast) carries its locale: force that language and
       // drop the Chinese teaching prompt, which would otherwise bias a foreign-language
@@ -294,7 +297,6 @@ class AIContentStore(private val context: Context) {
       // examples), so they keep the priming prompt and no forced language.
       val locale = record.audioLocale
       val prompt = if (locale == null) OpenAIService.transcriptionPrompt(record.language) else null
-      val multi = chunks.size > 1
       val sentences = mutableListOf<String>()
       val cues = mutableListOf<TranscriptCue>()
       // Cues stay usable only while every chunk so far yields timestamps; once one
@@ -302,10 +304,12 @@ class AIContentStore(private val context: Context) {
       // with cues that drift out of alignment.
       var cuesAligned = true
       try {
-        for ((i, chunk) in chunks.withIndex()) {
-          setJob(k, JobState.Running(if (multi) "轉錄中…（${i + 1}/${chunks.size}）" else "轉錄中…"))
+        chunks.buffer(2).collect { chunk ->
+          val i = chunk.index
+          val multi = chunk.count > 1
+          setJob(k, JobState.Running(if (multi) "轉錄中…（${i + 1}/${chunk.count}）" else "轉錄中…"))
           val result = OpenAIService.transcribe(
-            chunk, settings.transcriptionConfig(), prompt = prompt, language = locale)
+            chunk.file, settings.transcriptionConfig(), prompt = prompt, language = locale)
           // Each chunk is transcoded 0-based, so shift its timestamps onto the
           // absolute episode timeline by the chunk's start offset.
           val offset = i * AudioTranscoder.MAX_CHUNK_SECONDS.toDouble()
@@ -314,7 +318,7 @@ class AIContentStore(private val context: Context) {
           // Re-segment just this chunk into one sentence per line (adds punctuation
           // only, never alters content); keep its raw text if that fails so the paid
           // transcription isn't lost. Then align its sentences to its own timestamps.
-          setJob(k, JobState.Running(if (multi) "整理句子中…（${i + 1}/${chunks.size}）" else "整理句子中…"))
+          setJob(k, JobState.Running(if (multi) "整理句子中…（${i + 1}/${chunk.count}）" else "整理句子中…"))
           val chunkText = runCatching {
             OpenAIService.segmentTranscript(result.text, settings.chatConfig())
           }.getOrNull() ?: result.text
@@ -330,7 +334,7 @@ class AIContentStore(private val context: Context) {
           _partialTranscripts.update { it + (record.id to PartialTranscript(sentences.toList(), cuesSoFar)) }
         }
       } finally {
-        cleanupChunks(chunks, source)
+        cleanupAudio(record.id, source)
       }
 
       val text = sentences.joinToString("\n")
@@ -432,9 +436,11 @@ class AIContentStore(private val context: Context) {
   }
 
   /** Delete the transcoded chunk temps and any audio we downloaded to cache, keeping offline downloads. */
-  private fun cleanupChunks(chunks: List<File>, source: File) {
+  /** Delete the transcoded chunks of [id] (including any the transcoder produced
+   *  ahead of a failure) and the downloaded [source] if it lives in the cache. */
+  private fun cleanupAudio(id: String, source: File) {
     val cache = context.cacheDir
-    chunks.forEach { if (it != source && it.parentFile == cache) it.delete() }
+    cache.listFiles { f -> f.name.startsWith("ai-speech-$id") }?.forEach { it.delete() }
     if (source.parentFile == cache) source.delete()
   }
 

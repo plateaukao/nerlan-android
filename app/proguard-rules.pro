@@ -41,32 +41,28 @@
 # --- media3 (AudioTranscoder / Transformer) ----------------------------------
 # The transcribe path crashes on API < 31 devices (e.g. Hisense A7 / Android 10)
 # with NoClassDefFoundError: android.media.metrics.LogSessionId — but only in
-# R8-minified release builds. media3 guards that API-31 reference behind an
-# SDK_INT >= 31 check, but R8 full-mode optimization (horizontal class merging /
-# code relocation) moves it into an eagerly-verified path, so ART aborts when the
-# class is absent below API 31. A keep rule on LogSessionId itself is useless (the
-# class doesn't exist on the device), and pinning individual media3 classes only
-# makes R8 relocate the reference elsewhere — we hit it first in the Transformer
-# asset-loader factory, then again deeper on the internal ExoPlayer:Playback
-# thread (PlayerId/renderer init). The reliable fix per androidx/media#2535 is to
-# stop R8 optimizing media3 at all, which preserves every SDK_INT guard. Costs a
-# little APK size (media3 stays un-optimized); revisit if/when the upstream R8 bug
-# is fixed. disableHorizontalClassMerging alone does NOT fix it.
--keep class androidx.media3.** { *; }
+# R8-minified release builds. LogSessionId is an API-31 platform class. In
+# media3-exoplayer every use of it is isolated in @RequiresApi(31) helper classes
+# (PlayerId$LogSessionIdApi31, MediaCodecRenderer$Api31, ...), the pattern R8's
+# API-level modeling handles. media3-transformer is different: it passes a
+# LogSessionId as a plain parameter through its core signatures
+# (Codec.DecoderFactory, TransformerInternal, ExoPlayerAssetLoader,
+# AudioSampleExporter, ~20 classes), with no guard for R8 to respect, so any
+# optimization touching those methods (inlining / horizontal class merging) can
+# land the reference in an eagerly-verified path and ART aborts below API 31.
+# A keep rule on LogSessionId itself is useless (the class doesn't exist on the
+# device), and pinning individual classes only makes R8 relocate the reference —
+# we hit it first in the Transformer asset-loader factory, then on the internal
+# ExoPlayer:Playback thread (PlayerId/renderer init). Upstream: androidx/media#2535.
+#
+# The rule below disables *optimization* on the transformer module only; the
+# allowshrinking/allowobfuscation modifiers let R8 still remove unused code and
+# rename what's left. It used to be a plain `-keep class androidx.media3.** { *; }`,
+# which pinned all of media3 (25k methods, ~900 KB of APK) unshrunk. Revisit once
+# transformer guards LogSessionId behind Api31 helpers like exoplayer does, or
+# when AudioTranscoder moves off Transformer.
+-keep,allowshrinking,allowobfuscation class androidx.media3.transformer.** { *; }
 -dontwarn android.media.metrics.**
-
-# --- Glance -> WorkManager -> Room -------------------------------------------
-# Glance drags in work-runtime 2.7.1, which drags in room-runtime 2.2.5 — a Room
-# old enough to ship no R8-full-mode consumer rules. Room loads its generated
-# WorkDatabase_Impl *by name* and calls newInstance(), so as soon as R8 renames
-# that class or drops its no-arg constructor, WorkManager's startup initializer
-# throws "Failed to create an instance of androidx.work.impl.WorkDatabase" from
-# androidx.startup.InitializationProvider — the app dies before Application
-# .onCreate, in release builds only (found on the Android 10 phone; the debug
-# build and the emulator were both fine). WorkManager instantiates its Workers
-# by name for the same reason.
--keep class * extends androidx.room.RoomDatabase { <init>(); }
--keep class androidx.work.** { *; }
 
 # --- Glance -> WorkManager -> Room -------------------------------------------
 # Glance drags in work-runtime 2.7.1, which drags in room-runtime 2.2.5 — a Room

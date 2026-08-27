@@ -2,6 +2,7 @@ package com.example.nerlan.data
 
 import android.content.Context
 import android.net.Uri
+import android.os.SystemClock
 import com.example.nerlan.NerLanApp
 import java.io.File
 import kotlin.math.ceil
@@ -18,7 +19,6 @@ import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
-import okhttp3.Request
 
 /** Which AI artifact an action refers to; the prefix keys the job map. */
 enum class AiKind(val prefix: String) { TRANSCRIPT("transcript"), HANDOUT("handout") }
@@ -281,7 +281,14 @@ class AIContentStore(private val context: Context) {
     Log.i("AIContentStore", "transcription run started for ${record.id}")
     setJob(k, JobState.Running("處理音訊中…"))
     return try {
-      val source = audioFile(record) ?: throw Exception("找不到音訊檔")
+      // The audio is read in place — a local download if there is one, else the
+      // remote URL streamed through the player's data source — so nothing is
+      // fetched up front: chunk 0 pulls only its own five minutes, and the first
+      // text appears after the same wait whether the episode is 10 min or 2 h.
+      val local = NerLanApp.instance.downloads.localPath(record.id)?.let { File(it) }
+      val input = local?.let { Uri.fromFile(it) }
+        ?: record.audio?.let { Uri.parse(it) }
+        ?: throw Exception("找不到音訊檔")
       setJob(k, JobState.Running("轉錄中…"))
       // Long episodes are split into 5-min chunks (the gpt-4o-transcribe models cap
       // input at 1400 s anyway). Each chunk is transcribed, re-segmented and aligned
@@ -290,7 +297,8 @@ class AIContentStore(private val context: Context) {
       // whole episode. The transcoder is a flow collected with buffer(), so it runs
       // ahead in its own coroutine: chunk n+1 is transcoded (CPU/codec) while chunk
       // n is uploading and transcribing (network) — the two never wait on each other.
-      val chunks = AudioTranscoder.transcodeChunks(context, record.id, Uri.fromFile(source), source)
+      val durationMs = (record.durationSeconds ?: 0) * 1000L
+      val chunks = AudioTranscoder.transcodeChunks(context, record.id, input, durationMs, fallback = local)
       // A monolingual source (a podcast) carries its locale: force that language and
       // drop the Chinese teaching prompt, which would otherwise bias a foreign-language
       // podcast toward Chinese. NER programs are bilingual (Mandarin host + foreign
@@ -308,8 +316,11 @@ class AIContentStore(private val context: Context) {
           val i = chunk.index
           val multi = chunk.count > 1
           setJob(k, JobState.Running(if (multi) "轉錄中…（${i + 1}/${chunk.count}）" else "轉錄中…"))
+          val t0 = SystemClock.elapsedRealtime()
           val result = OpenAIService.transcribe(
             chunk.file, settings.transcriptionConfig(), prompt = prompt, language = locale)
+          Log.i("AIContentStore", "chunk ${i + 1}/${chunk.count}: ${chunk.file.length() / 1024} KB " +
+            "transcribed in ${SystemClock.elapsedRealtime() - t0} ms")
           // Each chunk is transcoded 0-based, so shift its timestamps onto the
           // absolute episode timeline by the chunk's start offset.
           val offset = i * AudioTranscoder.MAX_CHUNK_SECONDS.toDouble()
@@ -319,9 +330,11 @@ class AIContentStore(private val context: Context) {
           // only, never alters content); keep its raw text if that fails so the paid
           // transcription isn't lost. Then align its sentences to its own timestamps.
           setJob(k, JobState.Running(if (multi) "整理句子中…（${i + 1}/${chunk.count}）" else "整理句子中…"))
+          val t1 = SystemClock.elapsedRealtime()
           val chunkText = runCatching {
             OpenAIService.segmentTranscript(result.text, settings.chatConfig())
           }.getOrNull() ?: result.text
+          Log.i("AIContentStore", "chunk ${i + 1}/${chunk.count}: segmented in ${SystemClock.elapsedRealtime() - t1} ms")
           val chunkSentences = displaySentences(chunkText)
           val chunkCues = alignCues(chunkSentences, chunkSegments)
 
@@ -334,7 +347,7 @@ class AIContentStore(private val context: Context) {
           _partialTranscripts.update { it + (record.id to PartialTranscript(sentences.toList(), cuesSoFar)) }
         }
       } finally {
-        cleanupAudio(record.id, source)
+        cleanupAudio(record.id)
       }
 
       val text = sentences.joinToString("\n")
@@ -421,27 +434,12 @@ class AIContentStore(private val context: Context) {
     }
   }
 
-  /** Local download if present, otherwise fetch the remote audio to a cache file. */
-  private fun audioFile(record: EpisodeRecord): File? {
-    NerLanApp.instance.downloads.localPath(record.id)?.let { return File(it) }
-    val url = record.audio ?: return null
-    val tmp = File(context.cacheDir, "ai-audio-${record.id}.mp3").also { it.delete() }
-    val request = Request.Builder().url(url).build()
-    ChannelPlusApi.client.newCall(request).execute().use { response ->
-      if (!response.isSuccessful) throw Exception("HTTP ${response.code}")
-      val body = response.body ?: throw Exception("empty body")
-      body.byteStream().use { input -> tmp.outputStream().use { output -> input.copyTo(output) } }
-    }
-    return tmp
-  }
 
   /** Delete the transcoded chunk temps and any audio we downloaded to cache, keeping offline downloads. */
-  /** Delete the transcoded chunks of [id] (including any the transcoder produced
-   *  ahead of a failure) and the downloaded [source] if it lives in the cache. */
-  private fun cleanupAudio(id: String, source: File) {
-    val cache = context.cacheDir
-    cache.listFiles { f -> f.name.startsWith("ai-speech-$id") }?.forEach { it.delete() }
-    if (source.parentFile == cache) source.delete()
+  /** Delete the transcoded chunks of [id], including any the transcoder produced
+   *  ahead of a failure. */
+  private fun cleanupAudio(id: String) {
+    context.cacheDir.listFiles { f -> f.name.startsWith("ai-speech-$id") }?.forEach { it.delete() }
   }
 
   companion object {

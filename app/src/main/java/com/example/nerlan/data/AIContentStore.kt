@@ -11,6 +11,9 @@ import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +61,13 @@ class AIContentStore(private val context: Context) {
   /** Keyed "transcript:{id}" / "handout:{id}"; absence means idle. */
   private val _jobs = MutableStateFlow<Map<String, JobState>>(emptyMap())
   val jobs: StateFlow<Map<String, JobState>> = _jobs
+
+  /** Estimated overall progress (0–1) of a running transcription, keyed by
+   *  episode id, so the action button can show a percentage. Audio seconds
+   *  finished plus a wall-clock estimate of the chunk in flight — see
+   *  [runTranscript] / [progressTicker]. Mirrors the iOS transcriptProgress. */
+  private val _transcriptProgress = MutableStateFlow<Map<String, Float>>(emptyMap())
+  val transcriptProgress: StateFlow<Map<String, Float>> = _transcriptProgress
 
   /** Translation jobs, keyed by episode id; absence means idle. Translation is
    *  triggered from the transcript screen (not the shared AI action buttons), so
@@ -299,6 +309,23 @@ class AIContentStore(private val context: Context) {
       // n is uploading and transcribing (network) — the two never wait on each other.
       val durationMs = (record.durationSeconds ?: 0) * 1000L
       val chunks = AudioTranscoder.transcodeChunks(context, record.id, input, durationMs, fallback = local)
+      // Progress estimate: the chunk plan gives the overall scale; the per-audio-
+      // second processing rate (transcode + upload + transcription + sentence
+      // cleanup) is seeded per server+model and refined from each finished chunk.
+      val plan = AudioTranscoder.chunkSeconds(durationMs)
+      val totalSeconds = plan.sum()
+      val showProgress = totalSeconds > 0
+      val rateKey = rateKey(settings.transcriptionConfig())
+      var rate = savedRate(rateKey, fallback = 0.3)
+      var doneSeconds = 0.0
+      var ticker: Job? = null
+      var chunkStarted = SystemClock.elapsedRealtime()
+      fun startTicker(index: Int) {
+        ticker?.cancel()
+        ticker = if (showProgress && index < plan.size) {
+          progressTicker(record.id, done = doneSeconds, chunkSeconds = plan[index], total = totalSeconds, rate = rate)
+        } else null
+      }
       // A monolingual source (a podcast) carries its locale: force that language and
       // drop the Chinese teaching prompt, which would otherwise bias a foreign-language
       // podcast toward Chinese. NER programs are bilingual (Mandarin host + foreign
@@ -312,6 +339,7 @@ class AIContentStore(private val context: Context) {
       // with cues that drift out of alignment.
       var cuesAligned = true
       try {
+        startTicker(0)
         chunks.buffer(2).collect { chunk ->
           val i = chunk.index
           val multi = chunk.count > 1
@@ -338,6 +366,20 @@ class AIContentStore(private val context: Context) {
           val chunkSentences = displaySentences(chunkText)
           val chunkCues = alignCues(chunkSentences, chunkSegments)
 
+          // This chunk is done: blend the measured rate in for the next chunk's
+          // estimate, snap progress to the chunk boundary, and start the next ticker.
+          val chunkAudioSeconds = plan.getOrNull(i) ?: 0.0
+          if (chunkAudioSeconds > 0) {
+            val elapsed = (SystemClock.elapsedRealtime() - chunkStarted) / 1000.0
+            rate = (rate + elapsed / chunkAudioSeconds) / 2
+          }
+          doneSeconds += chunkAudioSeconds
+          if (showProgress) {
+            _transcriptProgress.update { it + (record.id to minOf(doneSeconds / totalSeconds, 0.99).toFloat()) }
+          }
+          chunkStarted = SystemClock.elapsedRealtime()
+          startTicker(i + 1)
+
           sentences += chunkSentences
           if (cuesAligned && chunkCues.size == chunkSentences.size) cues += chunkCues else cuesAligned = false
 
@@ -347,8 +389,11 @@ class AIContentStore(private val context: Context) {
           _partialTranscripts.update { it + (record.id to PartialTranscript(sentences.toList(), cuesSoFar)) }
         }
       } finally {
+        ticker?.cancel()
+        _transcriptProgress.update { it - record.id }
         cleanupAudio(record.id)
       }
+      if (showProgress) recordRate(rateKey, rate)
 
       val text = sentences.joinToString("\n")
       transcriptFile(record.id).writeText(text)
@@ -436,6 +481,44 @@ class AIContentStore(private val context: Context) {
 
 
   /** Delete the transcoded chunk temps and any audio we downloaded to cache, keeping offline downloads. */
+  // --- Progress estimate ------------------------------------------------------
+
+  /** Publishes [transcriptProgress] about once a second while one chunk is in
+   *  flight: [done] audio-seconds already finished, plus the current chunk scaled
+   *  by elapsed wall time against its expected processing time ([rate] seconds of
+   *  processing per second of audio). The in-chunk estimate caps at 95% so it
+   *  never claims a chunk that hasn't come back, and the total at 99% — only real
+   *  completion removes the entry. */
+  private fun progressTicker(id: String, done: Double, chunkSeconds: Double, total: Double, rate: Double): Job =
+    scope.launch {
+      val started = SystemClock.elapsedRealtime()
+      while (isActive) {
+        val expected = maxOf(chunkSeconds * rate, 5.0)
+        val frac = minOf((SystemClock.elapsedRealtime() - started) / 1000.0 / expected, 0.95)
+        _transcriptProgress.update { it + (id to minOf((done + frac * chunkSeconds) / total, 0.99).toFloat()) }
+        delay(1_000)
+      }
+    }
+
+  /** Rates vary enormously by server and model (and here by network: the upload
+   *  is part of it), so each finished run records its measured rate keyed by
+   *  server+model; the hardcoded seed only matters the first time. */
+  private fun rateKey(config: OpenAIService.Config): String =
+    "${Uri.parse(config.baseUrl).host ?: "?"}|${config.model}"
+
+  private val ratePrefs get() = context.getSharedPreferences("transcription_rates", Context.MODE_PRIVATE)
+
+  private fun savedRate(key: String, fallback: Double): Double =
+    ratePrefs.getFloat(key, fallback.toFloat()).toDouble()
+
+  private fun recordRate(key: String, measured: Double) {
+    if (measured <= 0 || !measured.isFinite()) return
+    // Blend with the previous value so one outlier run doesn't dominate.
+    val previous = ratePrefs.getFloat(key, -1f)
+    val blended = if (previous > 0) (previous + measured) / 2 else measured
+    ratePrefs.edit().putFloat(key, blended.toFloat()).apply()
+  }
+
   /** Delete the transcoded chunks of [id], including any the transcoder produced
    *  ahead of a failure. */
   private fun cleanupAudio(id: String) {

@@ -1,5 +1,6 @@
 package com.example.nerlan.ui
 
+import kotlin.math.roundToInt
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -62,6 +63,9 @@ fun AiActionButton(
     if (kind == AiKind.TRANSCRIPT) ai.hasTranscript(record.id) else ai.hasHandout(record.id)
   }
   val running = job is AIContentStore.JobState.Running
+  // While transcribing, the caption doubles as the progress readout (as on iOS).
+  val progressMap by ai.transcriptProgress.collectAsState()
+  val progress = if (running && kind == AiKind.TRANSCRIPT) progressMap[record.id] else null
   val failureMessage = (job as? AIContentStore.JobState.Failed)?.message
 
   var pendingOpen by remember { mutableStateOf(false) }
@@ -125,7 +129,12 @@ fun AiActionButton(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         AiIcon(kind, running, ready, failureMessage != null)
-        Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, modifier = Modifier.padding(start = 4.dp))
+        Text(
+          if (progress != null) "${(progress * 100).roundToInt()}%" else label,
+          style = MaterialTheme.typography.labelMedium,
+          maxLines = 1,
+          modifier = Modifier.padding(start = 4.dp),
+        )
       }
     }
     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {

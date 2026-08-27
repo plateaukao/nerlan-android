@@ -67,6 +67,17 @@ object AudioTranscoder {
   /** One transcoded piece of an episode: [file] holds chunk [index] of [count]. */
   class Chunk(val index: Int, val count: Int, val file: File)
 
+  /** Audio seconds per chunk that [transcodeChunks] will produce for a known
+   *  [durationMs]: full chunks then the remainder; empty when the length is
+   *  unknown. Drives the progress estimate. */
+  fun chunkSeconds(durationMs: Long): List<Double> {
+    if (durationMs <= 0L) return emptyList()
+    val maxMs = MAX_CHUNK_SECONDS * 1000
+    if (durationMs <= maxMs) return listOf(durationMs / 1000.0)
+    val count = ceil(durationMs.toDouble() / maxMs).toInt()
+    return (0 until count).map { i -> minOf(maxMs, durationMs - i * maxMs) / 1000.0 }
+  }
+
   /**
    * Transcode the audio and split it into chunks each no longer than
    * [MAX_CHUNK_SECONDS], emitted in order as each is ready; the caller deletes the

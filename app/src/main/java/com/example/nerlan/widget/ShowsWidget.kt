@@ -1,24 +1,11 @@
 package com.example.nerlan.widget
 
 import android.content.Context
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.glance.GlanceId
-import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
-import androidx.glance.LocalSize
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.state.getAppWidgetState
-import androidx.glance.state.PreferencesGlanceStateDefinition
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Column
-import androidx.glance.layout.Row
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
+import android.graphics.Bitmap
+import android.util.SizeF
+import android.view.View
+import android.widget.RemoteViews
+import com.example.nerlan.R
 
 /**
  * 我的節目 — favorited programs and subscribed podcasts, each cover tapping
@@ -30,99 +17,86 @@ import androidx.glance.layout.fillMaxWidth
  * an explicit set in an explicit order. Several copies can be placed, each
  * pinned to different shows.
  */
-class ShowsWidget : GlanceAppWidget() {
-  override val sizeMode = SizeMode.Exact
+object ShowsWidget {
+  /** Grid metrics; the frame applies PADDING on every side. MIN_CELL is the
+   *  smallest cell worth splitting into — it decides how many rows/columns a
+   *  given widget size gets, not how big the covers end up. */
+  private const val PADDING = 12f
+  private const val MIN_CELL = 64f
+  private const val GAP = 10f
+  private const val NAME_H = 16f
+  private const val HEADER_H = 24f
 
-  override suspend fun provideGlance(context: Context, id: GlanceId) {
-    val model = WidgetModelBuilder.build(context)
-
-    // Pinned selection, in the order it was picked. Stored as one joined string
-    // rather than a string set — a set has no order, and here the order *is* the
-    // layout.
-    val picked = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)[PICKED_SHOWS]
-      ?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+  fun render(context: Context, id: Int, size: SizeF, model: WidgetModel, covers: Map<String, Bitmap>): RemoteViews {
+    // Pinned selection, in the order it was picked; empty means automatic.
+    val picked = ShowsWidgetPrefs.picked(context, id)
     val byId = (model.shows + model.recents).associateBy { it.id }
     val shows = if (picked.isEmpty()) model.shows else picked.mapNotNull { byId[it] }
 
-    val covers = loadCovers(context, shows.take(12).map { it.coverUrl }, 128)
+    // The grid fills the widget: counts come from the real size, then the cover
+    // is sized to the resulting cell. Sizing covers to a fixed 56dp and stacking
+    // however many fit left nearly half the widget empty at anything but the
+    // smallest size.
+    val usableW = size.width - PADDING * 2
+    val showNames = size.width >= 220f
+    val gridH = size.height - PADDING * 2 - (if (showNames) HEADER_H else 0f)
+    val columns = ((usableW + GAP) / (MIN_CELL + GAP)).toInt().coerceIn(2, 4)
+    val rows = ((gridH + GAP) / (MIN_CELL + GAP)).toInt().coerceIn(1, 4)
+    val cellW = (usableW - GAP * (columns - 1)) / columns
+    val cellH = (gridH - GAP * (rows - 1)) / rows
+    // Keep covers square: the smaller of the two cell dimensions wins.
+    val coverDp = minOf(cellW, cellH - (if (showNames) NAME_H else 0f)).toInt().coerceAtLeast(40)
+    val visible = shows.take(columns * rows)
 
-    provideContent {
-      GlanceTheme {
-        WidgetSurface {
-          // The grid fills the widget: counts come from the real size, then the
-          // cover is sized to the resulting cell. Sizing covers to a fixed 56dp
-          // and stacking however many fit left nearly half the widget empty at
-          // anything but the smallest size.
-          val size = LocalSize.current
-          val usableW = size.width - PADDING * 2
-          val showNames = size.width >= 220.dp
-          val gridH = size.height - PADDING * 2 - (if (showNames) HEADER_H else 0.dp)
-
-          val columns = ((usableW + GAP) / (MIN_CELL + GAP)).toInt().coerceIn(2, 4)
-          val rows = ((gridH + GAP) / (MIN_CELL + GAP)).toInt().coerceIn(1, 4)
-          val cellW = (usableW - GAP * (columns - 1)) / columns
-          val cellH = (gridH - GAP * (rows - 1)) / rows
-          // Keep covers square: the smaller of the two cell dimensions wins.
-          val cover = minOf(cellW, cellH - (if (showNames) NAME_H else 0.dp))
-          val visible = shows.take(columns * rows)
-
-          if (visible.isEmpty()) {
-            WidgetEmptyState("點選節目旁的愛心\n就會出現在這裡", openTabAction("programs"))
-          } else {
-            Column(modifier = GlanceModifier.fillMaxSize()) {
-              if (showNames) WidgetHeader("我的節目")
-              visible.chunked(columns).forEach { rowShows ->
-                // defaultWeight spreads the rows down the whole widget, so
-                // there is no leftover strip at the bottom.
-                Row(
-                  modifier = GlanceModifier.fillMaxWidth().defaultWeight(),
-                  verticalAlignment = Alignment.CenterVertically,
-                ) {
-                  rowShows.forEach { show ->
-                    Column(
-                      modifier = GlanceModifier.defaultWeight(),
-                      horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                      WidgetCover(
-                        covers.cover(show.coverUrl),
-                        sizeDp = cover.value.toInt().coerceAtLeast(40),
-                        corner = 12,
-                        onClick = openShowAction(show.id, show.isPodcast),
-                      )
-                      if (showNames) {
-                        ColSpacer(3)
-                        WidgetCaption(show.name)
-                      }
-                    }
-                  }
-                  // Keep a short final row left-aligned instead of stretched.
-                  repeat(columns - rowShows.size) {
-                    Column(modifier = GlanceModifier.defaultWeight()) {}
-                  }
-                }
-              }
-            }
+    val content = if (visible.isEmpty()) {
+      WidgetViews.empty(context, "點選節目旁的愛心\n就會出現在這裡", WidgetIntents.openTab(context, "programs"))
+    } else {
+      RemoteViews(context.packageName, R.layout.widget_shows_grid).apply {
+        setViewVisibility(R.id.list_header, if (showNames) View.VISIBLE else View.GONE)
+        removeAllViews(R.id.rows_container)
+        for (rowShows in visible.chunked(columns)) {
+          val row = RemoteViews(context.packageName, R.layout.widget_shows_row)
+          for (show in rowShows) {
+            row.addView(
+              R.id.row_root,
+              RemoteViews(context.packageName, R.layout.widget_shows_cell).apply {
+                val open = WidgetIntents.openShow(context, show.id, show.isPodcast)
+                setImageViewBitmap(
+                  R.id.cell_cover, WidgetViews.cover(context, covers.cover(show.coverUrl), coverDp, cornerDp = 12))
+                setOnClickPendingIntent(R.id.cell_cover, open)
+                setViewVisibility(R.id.cell_name, if (showNames) View.VISIBLE else View.GONE)
+                setTextViewText(R.id.cell_name, show.name)
+                setOnClickPendingIntent(R.id.cell_name, open)
+              },
+            )
           }
+          // Keep a short final row left-aligned instead of stretched.
+          repeat(columns - rowShows.size) {
+            row.addView(R.id.row_root, RemoteViews(context.packageName, R.layout.widget_shows_spacer))
+          }
+          addView(R.id.rows_container, row)
         }
       }
     }
-  }
-
-  companion object {
-    /** Newline-joined show ids pinned for one widget instance. */
-    val PICKED_SHOWS = stringPreferencesKey("pickedShows")
-
-    /** Grid metrics; `WidgetSurface` applies PADDING on every side.
-     *  MIN_CELL is the smallest cell worth splitting into — it decides how many
-     *  rows/columns a given widget size gets, not how big the covers end up. */
-    private val PADDING = 12.dp
-    private val MIN_CELL = 64.dp
-    private val GAP = 10.dp
-    private val NAME_H = 16.dp
-    private val HEADER_H = 24.dp
+    return WidgetViews.frame(context, content)
   }
 }
 
-class ShowsWidgetReceiver : GlanceAppWidgetReceiver() {
-  override val glanceAppWidget: GlanceAppWidget = ShowsWidget()
+/** Per-instance pinned selection of the 我的節目 widget. Stored as one joined
+ *  string rather than a string set — a set has no order, and here the order *is*
+ *  the layout. */
+object ShowsWidgetPrefs {
+  private fun prefs(context: Context) = context.getSharedPreferences("widget_prefs", Context.MODE_PRIVATE)
+  private fun key(appWidgetId: Int) = "picked_shows_$appWidgetId"
+
+  fun picked(context: Context, appWidgetId: Int): List<String> =
+    prefs(context).getString(key(appWidgetId), null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty()
+
+  fun save(context: Context, appWidgetId: Int, ids: List<String>) {
+    prefs(context).edit().putString(key(appWidgetId), ids.joinToString("\n")).apply()
+  }
+
+  fun clear(context: Context, appWidgetId: Int) {
+    prefs(context).edit().remove(key(appWidgetId)).apply()
+  }
 }

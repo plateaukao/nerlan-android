@@ -1,20 +1,9 @@
 package com.example.nerlan.widget
 
 import android.content.Context
-import androidx.glance.GlanceId
-import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
-import androidx.glance.LocalSize
-import androidx.glance.action.clickable
-import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetReceiver
-import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.provideContent
-import androidx.glance.layout.Alignment
-import androidx.glance.layout.Column
-import androidx.glance.layout.Row
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
+import android.graphics.Bitmap
+import android.util.SizeF
+import android.widget.RemoteViews
 import com.example.nerlan.R
 
 /**
@@ -26,89 +15,59 @@ import com.example.nerlan.R
  * you've been *doing* — for a sequential language course, the thing worth one tap
  * from the home screen.
  */
-class RecentShowsWidget : GlanceAppWidget() {
-  // Exact, not Responsive: the coarse buckets left a 2-cell-high widget showing
-  // 2 rows where 3 fit, with the slack pooling as dead space at the bottom.
-  override val sizeMode = SizeMode.Exact
+object RecentShowsWidget {
+  const val MAX_ROWS = 6
+  private const val HEADER_DP = 26f
+  private const val ROW_DP = 56f
 
-  override suspend fun provideGlance(context: Context, id: GlanceId) {
-    val model = WidgetModelBuilder.build(context)
-    val covers = loadCovers(context, model.recents.take(MAX_ROWS).map { it.coverUrl }, 128)
+  fun render(context: Context, size: SizeF, model: WidgetModel, covers: Map<String, Bitmap>): RemoteViews {
+    // Inner space after the frame's 12dp padding; every row the height actually
+    // fits gets used (a list row runs ~56dp).
+    val innerHeight = size.height - 24f
+    val rows =
+      if (innerHeight < 150f) 1
+      else ((innerHeight - HEADER_DP) / ROW_DP).toInt().coerceIn(1, MAX_ROWS)
+    val shows = model.recents.take(rows)
+    val content = when {
+      shows.isEmpty() ->
+        WidgetViews.empty(context, "播放過的節目\n會出現在這裡", WidgetIntents.openTab(context, "programs"))
+      rows == 1 -> single(context, shows.first(), covers)
+      else -> list(context, shows, covers)
+    }
+    return WidgetViews.frame(context, content)
+  }
 
-    provideContent {
-      GlanceTheme {
-        WidgetSurface {
-          val size = LocalSize.current
-          // Inner space after WidgetSurface's 12dp padding; every row the height
-          // actually fits gets used (a WidgetListRow runs ~56dp).
-          val innerHeight = size.height.value - 24f
-          val rows =
-            if (innerHeight < 150f) 1
-            else ((innerHeight - HEADER_DP) / ROW_DP).toInt().coerceIn(1, MAX_ROWS)
-          val shows = model.recents.take(rows)
-          when {
-            shows.isEmpty() ->
-              WidgetEmptyState("播放過的節目\n會出現在這裡", openTabAction("programs"))
+  private fun single(context: Context, show: WidgetShow, covers: Map<String, Bitmap>) =
+    RemoteViews(context.packageName, R.layout.widget_hero_small).apply {
+      val open = WidgetIntents.openShow(context, show.id, show.isPodcast)
+      setImageViewBitmap(R.id.hero_cover, WidgetViews.cover(context, covers.cover(show.coverUrl), 48))
+      setOnClickPendingIntent(R.id.hero_cover, open)
+      setImageViewResource(R.id.play_button, R.drawable.ic_widget_play)
+      setOnClickPendingIntent(R.id.play_button, WidgetIntents.playShow(context, show.id, show.isPodcast))
+      setTextViewText(R.id.hero_caption, show.name)
+      setTextViewText(R.id.hero_title, show.lastEpisodeTitle ?: "")
+      setOnClickPendingIntent(R.id.hero_text, open)
+      WidgetViews.progress(this, R.id.hero_progress, show.resumeProgress)
+    }
 
-            rows == 1 -> {
-              val show = shows.first()
-              Column(
-                modifier = GlanceModifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-              ) {
-                Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                  WidgetCover(
-                    covers.cover(show.coverUrl), sizeDp = 48,
-                    onClick = openShowAction(show.id, show.isPodcast),
-                  )
-                  RowSpacer(8)
-                  WidgetIconButton(
-                    R.drawable.ic_widget_play,
-                    playShowAction(show.id, show.isPodcast),
-                  )
-                }
-                ColSpacer(8)
-                Column(modifier = GlanceModifier.clickable(openShowAction(show.id, show.isPodcast))) {
-                  WidgetCaption(show.name)
-                  WidgetTitle(show.lastEpisodeTitle ?: "")
-                }
-                show.resumeProgress?.let {
-                  ColSpacer(6)
-                  WidgetProgressBar(it, widthDp = 120, heightDp = 4)
-                }
-              }
-            }
-
-            else -> Column(
-              modifier = GlanceModifier.fillMaxSize(),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              WidgetHeader("最近播放")
-              shows.forEach { show ->
-                WidgetListRow(
-                  bitmap = covers.cover(show.coverUrl),
-                  title = show.lastEpisodeTitle ?: "",
-                  caption = show.name,
-                  progress = show.resumeProgress,
-                  openAction = openShowAction(show.id, show.isPodcast),
-                  buttonRes = R.drawable.ic_widget_play,
-                  buttonAction = playShowAction(show.id, show.isPodcast),
-                )
-              }
-            }
-          }
-        }
+  private fun list(context: Context, shows: List<WidgetShow>, covers: Map<String, Bitmap>) =
+    RemoteViews(context.packageName, R.layout.widget_list).apply {
+      setTextViewText(R.id.list_header, "最近播放")
+      removeAllViews(R.id.rows_container)
+      for (show in shows) {
+        addView(
+          R.id.rows_container,
+          WidgetViews.listRow(
+            context,
+            bitmap = covers.cover(show.coverUrl),
+            title = show.lastEpisodeTitle ?: "",
+            caption = show.name,
+            progress = show.resumeProgress,
+            open = WidgetIntents.openShow(context, show.id, show.isPodcast),
+            buttonRes = R.drawable.ic_widget_play,
+            buttonClick = WidgetIntents.playShow(context, show.id, show.isPodcast),
+          ),
+        )
       }
     }
-  }
-
-  private companion object {
-    const val MAX_ROWS = 6
-    const val HEADER_DP = 26f
-    const val ROW_DP = 56f
-  }
-}
-
-class RecentShowsWidgetReceiver : GlanceAppWidgetReceiver() {
-  override val glanceAppWidget: GlanceAppWidget = RecentShowsWidget()
 }

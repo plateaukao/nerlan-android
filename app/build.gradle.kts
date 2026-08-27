@@ -44,9 +44,20 @@ android {
       shaders = false
     }
 
+    androidResources {
+      // The app's own UI strings live in Kotlin, so resource locales only matter
+      // for library strings (media3-session notification actions, appcompat, GMS).
+      // Without this filter the arsc carries 87 locales of them — 450 KB of APK.
+      localeFilters += listOf("en", "zh-rTW", "zh-rHK", "zh-rCN", "ja", "ko")
+    }
     packaging {
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // Licence copies, version markers and kotlin-reflect metadata the app never reads.
+        excludes += "/META-INF/androidx/**"
+        excludes += "/META-INF/*.version"
+        excludes += "/kotlin/**"
+        excludes += "DebugProbesKt.bin"
       }
     }
 }
@@ -103,10 +114,6 @@ dependencies {
   implementation(libs.androidx.media3.datasource)
   // Audio transcode (shrink episodes for OpenAI's 25 MB upload cap)
   implementation(libs.androidx.media3.transformer)
-
-  // Home-screen widgets (Glance = Compose for RemoteViews)
-  implementation(libs.androidx.glance.appwidget)
-  implementation(libs.androidx.glance.material3)
 
   // Networking / JSON / images
   implementation(libs.okhttp)

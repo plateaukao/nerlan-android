@@ -1,12 +1,8 @@
 package com.example.nerlan.widget
 
 import android.content.Context
-import androidx.glance.appwidget.updateAll
 import com.example.nerlan.NerLanApp
 import com.example.nerlan.player.PlayerManager
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -26,10 +22,8 @@ import kotlinx.coroutines.launch
  * promise without a foreground update loop.
  */
 object WidgetRefresher {
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
   fun start(app: NerLanApp) {
-    scope.launch {
+    WidgetRenderer.scope.launch {
       merge(
         PlayerManager.current.map { },
         PlayerManager.isPlaying.map { },
@@ -43,11 +37,6 @@ object WidgetRefresher {
   }
 
   suspend fun refreshAll(context: Context) {
-    runCatching {
-      UpNextWidget().updateAll(context)
-      RecentShowsWidget().updateAll(context)
-      ShowsWidget().updateAll(context)
-      StatsWidget().updateAll(context)
-    }
+    runCatching { WidgetRenderer.renderAll(context) }
   }
 }

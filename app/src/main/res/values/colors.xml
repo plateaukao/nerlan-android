@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget palette. RemoteViews can't read the Compose theme, so the
+     Material 3 baseline lives here (light / values-night), and values-v31 swaps in
+     the system's dynamic colors — the same split Glance's GlanceTheme made. -->
+<resources>
+    <color name="widget_background">#FFFBFE</color>
+    <color name="widget_on_surface">#1C1B1F</color>
+    <color name="widget_on_surface_variant">#49454F</color>
+    <color name="widget_secondary_container">#E8DEF8</color>
+    <color name="widget_surface_variant">#E7E0EC</color>
+    <color name="widget_primary">#6750A4</color>
+</resources>

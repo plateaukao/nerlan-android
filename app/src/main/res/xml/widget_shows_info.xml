@@ -11,4 +11,4 @@
     android:widgetCategory="home_screen"
     android:configure="com.example.nerlan.widget.ShowsWidgetConfigActivity"
     android:widgetFeatures="reconfigurable|configuration_optional"
-    android:initialLayout="@layout/glance_default_loading_layout" />
+    android:initialLayout="@layout/widget_loading" />

@@ -1,23 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shown in the launcher's widget picker; the real content is rendered once the
-     widget is placed. This is just a static stand-in. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/empty_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="12dp"
-    android:background="?android:attr/colorBackground">
+    android:padding="12dp">
     <ImageView
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
         android:src="@drawable/ic_widget_note"
         android:contentDescription="@null" />
     <TextView
+        android:id="@+id/empty_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:text="@string/app_name"
-        android:textSize="12sp"
-        android:textColor="?android:attr/textColorSecondary" />
+        android:gravity="center"
+        android:textColor="@color/widget_on_surface_variant"
+        android:textSize="12sp" />
 </LinearLayout>

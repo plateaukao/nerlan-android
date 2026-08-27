@@ -31,8 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.glance.appwidget.state.updateAppWidgetState
-import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.lifecycle.lifecycleScope
 import com.example.nerlan.theme.MyApplicationTheme
 import kotlinx.coroutines.Dispatchers
@@ -131,15 +129,11 @@ class ShowsWidgetConfigActivity : ComponentActivity() {
 
   private fun save(ids: List<String>) {
     lifecycleScope.launch {
-      // getGlanceIdBy throws IllegalArgumentException for an id the host no
-      // longer knows — the widget can be dragged off the home screen while this
-      // screen sits open. Losing the selection is fine; crashing is not.
+      ShowsWidgetPrefs.save(this@ShowsWidgetConfigActivity, appWidgetId, ids)
+      // The widget can be dragged off the home screen while this screen sits
+      // open; losing the selection is fine, crashing is not.
       runCatching {
-        val glanceId = GlanceAppWidgetManager(this@ShowsWidgetConfigActivity).getGlanceIdBy(appWidgetId)
-        updateAppWidgetState(this@ShowsWidgetConfigActivity, glanceId) { prefs ->
-          prefs[ShowsWidget.PICKED_SHOWS] = ids.joinToString("\n")
-        }
-        ShowsWidget().update(this@ShowsWidgetConfigActivity, glanceId)
+        WidgetRenderer.render(applicationContext, mapOf(WidgetKind.SHOWS to intArrayOf(appWidgetId)))
       }
       setResult(
         Activity.RESULT_OK,

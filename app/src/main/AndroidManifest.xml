@@ -91,6 +91,12 @@
                 android:resource="@xml/widget_shows_info" />
         </receiver>
 
+        <!-- Widget buttons (play/pause, next, back 15 s, play episode/show) land
+             here as broadcasts; see WidgetActions. -->
+        <receiver
+            android:name=".widget.WidgetActionReceiver"
+            android:exported="false" />
+
         <receiver
             android:name=".widget.StatsWidgetReceiver"
             android:exported="false"

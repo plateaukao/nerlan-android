@@ -158,6 +158,8 @@ pre code { background: none; border: none; color: inherit; padding: 0; }
 }
 
 .hero__cta { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+.hero__note { margin: 0.9rem 0 0; color: var(--mid); font-size: 0.9rem; }
+.download-card .btn + .btn { margin-left: 0.5rem; }
 
 .btn {
   display: inline-block;

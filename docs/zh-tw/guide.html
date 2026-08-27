@@ -14,7 +14,7 @@
     gtag('config', 'G-XQSZXV7E00');
   </script>
   <title>NerLan 使用說明</title>
-  <meta name="description" content="NerLan 的完整說明：瀏覽節目、播放器、AI 逐字稿與講義、翻譯、跟讀、下載、小工具、同步與設定。">
+  <meta name="description" content="NerLan 的完整說明：加入 Podcast、播放器、AI 逐字稿與講義、翻譯、跟讀、下載、小工具、Siri、iCloud 同步與設定。">
   <link rel="icon" href="../favicon.ico" sizes="any">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="../apple-touch-icon.png">
@@ -30,7 +30,7 @@
     <ul class="site-nav__links">
       <li><a href="guide.html" class="active">使用說明</a></li>
       <li><a href="download.html">下載</a></li>
-      <li><a href="https://github.com/plateaukao/nerlan-android">GitHub</a></li>
+      <li><a href="https://github.com/plateaukao/nerlan">GitHub</a></li>
     </ul>
   </div>
 </nav>
@@ -45,8 +45,8 @@
   </ul>
   <div class="toc-section">收聽</div>
   <ul>
-    <li><a href="#programs">瀏覽節目</a></li>
     <li><a href="#podcasts">加入 Podcast</a></li>
+    <li><a href="#programs">你的節目</a></li>
     <li><a href="#player">播放器</a></li>
     <li><a href="#downloads">下載與快取</a></li>
   </ul>
@@ -57,14 +57,14 @@
     <li><a href="#translation">翻譯</a></li>
     <li><a href="#shadowing">跟讀</a></li>
     <li><a href="#handouts">AI 講義</a></li>
-    <li><a href="#pdf">PDF 講義</a></li>
     <li><a href="#ai-tab">AI 資料庫</a></li>
   </ul>
   <div class="toc-section">整理</div>
   <ul>
     <li><a href="#favorites-notes">收藏與註記</a></li>
     <li><a href="#widgets">主畫面小工具</a></li>
-    <li><a href="#sync">Google 雲端同步</a></li>
+    <li><a href="#siri">Siri</a></li>
+    <li><a href="#sync">iCloud 同步</a></li>
     <li><a href="#stats">統計</a></li>
   </ul>
   <div class="toc-section">參考</div>
@@ -78,43 +78,43 @@
 
 <section id="overview">
   <h2>簡介</h2>
-  <p>NerLan 是一個「先聽再學」的語言學習 App。它可以播放你加入的任何 Podcast——日語、韓語、英語、法語，你正在學的都行。在一般播放之外，它疊上一整組學習工具：逐句跟著音檔走的 AI 逐字稿、複習講義、逐句翻譯，以及可以錄下自己聲音的跟讀練習。</p>
-  <p>開始很簡單：打開<strong>節目</strong>分頁，點一個語言、打開一個節目、點一集開始播。其他的一切——下載、逐字稿、講義——都只再多一個按鍵。</p>
+  <p>NerLan 是一個「先聽再學」的語言學習 App，適用於 iPhone 與 iPad。它可以播放你加入的任何 Podcast——日語、韓語、英語、法語、西班牙語，你正在學的都行。在一般播放之外，它疊上一整組學習工具：逐句跟著音檔走的 AI 逐字稿、複習講義、逐句翻譯，以及可以錄下自己聲音的跟讀練習。</p>
+  <p>App 介面為繁體中文；本說明中的粗體字，就是 App 裡實際的按鈕與選項名稱。</p>
+  <p>開始很簡單：打開<strong>節目</strong>分頁，點<strong>＋</strong>加入一個 Podcast，打開節目、點一集開始播。其他的一切——下載、逐字稿、講義——都只再多一個按鍵。</p>
 </section>
 
 <section id="interface">
   <h2>四個分頁</h2>
   <div class="table-wrap"><table>
     <tr><th>分頁</th><th>內容</th></tr>
-    <tr><td><strong>節目</strong></td><td>你的節目列表，附語言篩選與設定按鈕。</td></tr>
-    <tr><td><strong>收藏</strong></td><td>你按過愛心的節目與單集，依節目分組。</td></tr>
-    <tr><td><strong>下載</strong></td><td>離線保存的單集——手動下載與自動快取。</td></tr>
+    <tr><td><strong>節目</strong></td><td>你訂閱的 Podcast，加上新增（＋）與設定（齒輪）按鈕。</td></tr>
+    <tr><td><strong>收藏</strong></td><td>你按過愛心的單集，依節目分組。</td></tr>
+    <tr><td><strong>下載</strong></td><td>離線保存的單集——手動下載與自動快取的串流音檔。</td></tr>
     <tr><td><strong>AI</strong></td><td>所有已產生逐字稿或講義的單集——你的學習資料庫。</td></tr>
   </table></div>
-  <p>只要有載入單集，分頁上方就會浮著迷你播放列：點封面或標題開啟完整播放器。分頁會保留各自的狀態——篩選、捲動位置、打開的節目頁在切換後都還在。</p>
-  <p>在大螢幕（平板、桌面視窗）上會變成雙欄版面：瀏覽列表縮到左欄，右側自動顯示學習內容——逐字稿、講義或 PDF——邊聽邊讀。</p>
-</section>
-
-<section id="programs">
-  <h2>瀏覽節目</h2>
-  <img class="device-img" src="../images/programs.png" alt="以日語篩選的節目列表">
-  <p><strong>節目</strong>分頁列出你的節目，依語言分組。最上方是一列篩選 chip；最多人學的語言（英語、日語、韓語、法語）排在前面，點箭頭（<strong>展開語言</strong>）可以展開全部語言。選擇會被記住；<strong>全部</strong>顯示所有節目。</p>
-  <p>每列節目顯示封面、名稱、程度（有標示時，例如初階）與集數（<strong>共 N 集</strong>）。點開節目頁：</p>
-  <img class="device-img" src="../images/program-detail.png" alt="節目頁">
-  <ul>
-    <li>右上角的愛心（<strong>收藏節目</strong>）收藏整個節目——它會出現在收藏分頁與「我的節目」小工具。</li>
-    <li>節目介紹預設收合成三行，點一下展開。</li>
-    <li><strong>單集列表</strong>由最早的一集開始，往下捲會自動載入更多。載入過的內容有快取，重開節目頁是即時的。</li>
-    <li>每一集都有愛心（<strong>收藏</strong>）與下載按鈕（<strong>下載</strong>）；點該列開始播放，之後的單集自動排入播放佇列。下拉可以重新整理。</li>
-  </ul>
-  <p>目錄本身也有磁碟快取，離線也能瀏覽、開 App 即顯示；下拉才會抓最新列表。</p>
+  <p>只要有載入單集，分頁上方就會浮著迷你播放列：點封面或標題開啟完整播放器。分頁會保留各自的狀態——捲動位置、打開的節目頁在切換後都還在。</p>
+  <p>在 iPad 上會變成雙欄版面：瀏覽列表放在左欄，右側自動顯示正在收聽單集的學習內容——逐字稿或講義——邊聽邊讀。</p>
 </section>
 
 <section id="podcasts">
   <h2>加入 Podcast</h2>
-  <img class="device-img" src="../images/podcast.png" alt="節目列表上方的我的 Podcast 區塊，訂閱了韓文 Podcast">
-  <p>節目分頁右上角的<strong>＋</strong>開啟<strong>新增 Podcast</strong>。貼上 Apple Podcasts 連結（podcasts.apple.com 或 apple.co 短網址）或 RSS feed 網址即可——對話框裡的<strong>到 Apple Podcasts 搜尋節目</strong>會幫你打開瀏覽器搜尋，把節目連結複製回來貼上就好。</p>
-  <p>訂閱的節目顯示在節目分頁最上方的<strong>我的 Podcast</strong>（未套用語言篩選時）。長按 Podcast 列可<strong>取消訂閱</strong>。Podcast 的單集頁和其他節目頁一樣：下拉更新新集數、愛心、下載。</p>
+  <img class="device-img" src="../images/podcast.png" alt="新增 Podcast 對話框，可貼上 Apple Podcasts 或 RSS 連結">
+  <p>節目分頁的<strong>＋</strong>開啟<strong>新增 Podcast</strong>。貼上 Apple Podcasts 連結（podcasts.apple.com 或 apple.co 短網址）或 RSS feed 網址，點<strong>新增</strong>即可。對話框裡的<strong>到 Apple Podcasts 搜尋節目</strong>會幫你打開 Apple Podcasts 搜尋，把節目連結複製回來貼上就好。</p>
+  <p>訂閱的節目顯示在節目分頁的<strong>我的 Podcast</strong>。向左滑節目列可<strong>取消訂閱</strong>。</p>
+</section>
+
+<section id="programs">
+  <h2>你的節目</h2>
+  <img class="device-img" src="../images/programs.png" alt="節目分頁列出五個訂閱的 Podcast">
+  <p><strong>節目</strong>分頁列出你的訂閱：封面、名稱、作者與集數（<strong>共 N 集</strong>）。點開節目頁：</p>
+  <img class="device-img" src="../images/program-detail.png" alt="節目頁與單集列表">
+  <ul>
+    <li>節目介紹預設收合成三行，點一下展開。</li>
+    <li><strong>單集列表</strong>是 feed 裡的完整單集，最新的在前。下拉可以重新整理、抓新集數。</li>
+    <li>每一集都有愛心（<strong>收藏</strong>）與下載按鈕（<strong>下載</strong>）；點該列開始播放，之後的單集自動排入播放佇列。</li>
+    <li>長按單集可加上<strong>註記</strong>——見<a href="#favorites-notes">收藏與註記</a>。</li>
+    <li>頂端列的對話泡泡按鈕可設定節目的 <strong>Siri 名稱</strong>——見 <a href="#siri">Siri</a>。</li>
+  </ul>
 </section>
 
 <section id="player">
@@ -122,24 +122,24 @@
   <img class="device-img" src="../images/player.png" alt="完整播放器">
   <p>點迷你播放列開啟完整播放器。</p>
   <ul>
-    <li><strong>播放控制：</strong>上一集 · 倒退15秒 · 播放/暫停 · 快轉15秒 · 下一集，加上可拖曳的進度條。</li>
-    <li><strong>重複</strong>循環切換：不重複 → 重複播放清單 → 重複單集；<strong>倍速</strong>提供 0.5×–2×。兩者都會被記住。</li>
-    <li><strong>收藏</strong>是單集愛心；下載控制會顯示 下載、進度環或 已下載。</li>
-    <li>有 PDF 附件的單集會多一個<strong>講義</strong>按鈕（見 <a href="#pdf">PDF 講義</a>）。</li>
-    <li>設定好 AI 後會多一列：<strong>字幕</strong>（播放器內同步逐字稿）、<strong>跟讀</strong>、<strong>逐字稿</strong>、<strong>AI 講義</strong>。</li>
+    <li><strong>播放控制：</strong>上一集 · 倒退 15 秒 · 播放/暫停 · 快轉 15 秒 · 下一集。進度條顯示已播放與總時間。</li>
+    <li><strong>重複</strong>循環切換：不重複 → 重複播放清單 → 重複單集；<strong>倍速</strong>提供 0.5×–2×。兩者都會跨啟動記住。</li>
+    <li><strong>收藏</strong>是單集愛心；下載控制會顯示 下載、轉圈或 已下載。</li>
+    <li>設定好 AI 後會多一列：<strong>逐字稿</strong>與 <strong>AI 講義</strong>；當單集有帶時間戳的逐字稿時，還會加上<strong>字幕</strong>（播放器內同步字幕）與<strong>跟讀</strong>。</li>
+    <li>點封面可跳到節目的單集列表。</li>
   </ul>
-  <p>播放在背景繼續，有媒體通知與鎖定畫面控制；拔掉耳機自動暫停；持有喚醒鎖，關螢幕串流也不會中斷。每一集都會記住播放位置，下次接著聽；聽完一集會清掉進度，重聽從頭開始。</p>
+  <p>播放在背景繼續，鎖定畫面與控制中心都有播放控制。每一集都會記住播放位置，下次接著聽；聽完一集會清掉進度，重聽從頭開始。</p>
 </section>
 
 <section id="downloads">
   <h2>下載與串流快取</h2>
   <img class="device-img" src="../images/downloads.png" alt="下載分頁">
-  <p>在任何單集上按<strong>下載</strong>就能離線收聽——單集的 PDF 講義也會一併自動下載。最多同時下載三個，進度顯示在該列的圓環上。</p>
-  <p>另外還有<strong>串流快取</strong>（預設關閉，見<a href="#settings">設定</a>）：開啟後，串流聽過的音檔會保留下來；完整聽完的一集就成為可離線播放的快取，上限 2&nbsp;GB，滿了淘汰最久沒用的。</p>
-  <p><strong>下載</strong>分頁把兩種離線內容放在一起，依單集順序排列：</p>
+  <p>在任何單集上按<strong>下載</strong>，就會把音檔存下來離線收聽。</p>
+  <p>另外還有<strong>串流時自動快取</strong>（串流快取，預設關閉，見<a href="#settings">設定</a>）：開啟後，串流聽過的音檔會保留下來；完整聽完的一集就成為可離線播放的快取。設定裡的<strong>清除快取音檔</strong>可清空快取。</p>
+  <p><strong>下載</strong>分頁把兩種離線內容放在一起：</p>
   <ul>
-    <li><strong>實心勾勾徽章＝已下載</strong>（手動下載）；<strong>空心、較淡的勾勾＝快取</strong>。用實心與否區分，不靠顏色，所以在電子紙螢幕上也一眼可辨。</li>
-    <li>篩選按鈕（<strong>篩選</strong>）可只看 全部 / 已下載 / 快取；分段控制可依<strong>節目</strong>或<strong>語言</strong>分組。</li>
+    <li><strong>綠色勾勾＝已下載</strong>（手動下載）；<strong>較淡的勾勾＝快取</strong>（串流時留下的）。</li>
+    <li>篩選按鈕（<strong>顯示</strong>）可只看 全部 / 已下載 / 快取；分段控制可依<strong>節目</strong>或<strong>語言</strong>分組。</li>
     <li>向左滑刪除本機音檔；長按編輯註記。</li>
   </ul>
 </section>
@@ -150,15 +150,15 @@
   <h3>OpenAI 官方</h3>
   <img class="device-img" src="../images/settings.png" alt="OpenAI 官方模式的設定畫面">
   <ul>
-    <li><strong>OpenAI API 金鑰</strong>——你的金鑰，儲存在裝置上。產生內容使用你自己的 OpenAI 額度。</li>
-    <li><strong>轉錄模型</strong>——whisper-1（回傳時間戳，供同步字幕使用）、gpt-4o-mini-transcribe 或 gpt-4o-transcribe。</li>
-    <li><strong>講義模型</strong>——自由填寫，預設 <code>gpt-4o</code>；用於講義、翻譯與斷句。<strong>恢復預設模型</strong>還原兩者。</li>
+    <li><strong>OpenAI API 金鑰</strong>——你的金鑰，儲存在裝置的鑰匙圈（Keychain）。產生內容使用你自己的 OpenAI 額度。</li>
+    <li><strong>轉錄模型</strong>——whisper-1（回傳時間戳，供同步字幕使用）、gpt-4o-mini-transcribe、gpt-4o-transcribe 或 gpt-4o-transcribe-diarize。</li>
+    <li><strong>講義模型</strong>——自由填寫；用於講義、翻譯與斷句。<strong>恢復預設模型</strong>還原兩者。</li>
   </ul>
   <h3>自訂</h3>
   <img class="device-img" src="../images/settings-custom.png" alt="自訂 AI 伺服器設定">
   <p>把 AI 功能指向任何 OpenAI 相容伺服器——通常較便宜，或跑在你自己的機器上（whisperASR、Ollama、代理伺服器）。兩個端點分開設定：</p>
   <ul>
-    <li><strong>轉錄伺服器</strong>——伺服器網址（到 <code>/v1</code> 為止）、轉錄模型、選填的金鑰。用於 <code>/audio/transcriptions</code>。</li>
+    <li><strong>轉錄伺服器</strong>——伺服器網址（到 <code>/v1</code> 為止）、轉錄模型、選填的金鑰。用於 <code>/audio/transcriptions</code>。放大鏡按鈕（<strong>搜尋區域網路伺服器</strong>）會透過 Bonjour 找出區域網路上的 whisperASR 伺服器，自動幫你填入位址。</li>
     <li><strong>講義／翻譯伺服器</strong>——網址、對話模型、選填金鑰，以及<strong>停用思考模式（no think）</strong>開關：送出 <code>reasoning_effort=none</code>，讓本機思考模型（qwen3、deepseek-r1 等）跳過思考輸出。用於講義、翻譯與斷句。</li>
     <li>每一組都有驗證列——<strong>驗證轉錄伺服器</strong>／<strong>驗證講義／翻譯伺服器</strong>——實際送出測試請求，成功打勾，失敗直接顯示伺服器回傳的錯誤訊息。</li>
   </ul>
@@ -167,64 +167,58 @@
 
 <section id="transcripts">
   <h2>逐字稿</h2>
-  <p><strong>逐字稿</strong>按鈕——在播放器或單集列上——把單集轉成乾淨、有標點的逐句文字。空心圖示代表尚未產生；點一下開始，完成後自動打開。實心圖示代表已存在，點了立即開啟。長按可<strong>重新產生</strong>或<strong>刪除逐字稿</strong>。</p>
-  <p>長單集會以約 20 分鐘為單位分段轉錄；第一段完成就先開給你看，其餘陸續補上，並顯示 轉錄中…（1/3） 這樣的進度。關掉播放器，工作仍會繼續。</p>
+  <p><strong>逐字稿</strong>按鈕——在播放器或單集列上——把單集轉成乾淨、有標點的逐句文字。空心圖示代表尚未產生；點一下開始，並顯示進度。實心圖示代表已存在，點了立即開啟。長按可<strong>重新產生</strong>或<strong>刪除逐字稿</strong>。關掉播放器，工作仍會繼續。</p>
   <img class="device-img" src="../images/transcript.png" alt="逐字稿，朗讀中的句子醒目顯示並置中">
   <p>在逐字稿畫面裡：</p>
   <ul>
     <li>使用有時間戳的模型（whisper-1）時，<strong>正在朗讀的句子會醒目顯示並保持置中</strong>。在播放器點 字幕 可以把封面換成同樣的同步畫面。</li>
-    <li><strong>字體大小</strong>循環三種字級；<strong>複製全部</strong>複製全文；逐字稿打開時螢幕不會自動熄滅。</li>
-    <li><strong>跟讀</strong>切換到跟讀模式（見下）；<strong>翻譯</strong>循環翻譯檢視（見下）。</li>
+    <li>工具列可循環三種<strong>字體大小</strong>、循環<strong>翻譯</strong>檢視（見下），以及<strong>複製全文</strong>；逐字稿打開時螢幕不會自動熄滅。</li>
+    <li>長按句子可<strong>複製</strong>、<strong>從這裡播放</strong>或<strong>重複這句</strong>。</li>
   </ul>
 </section>
 
 <section id="translation">
   <h2>翻譯</h2>
   <img class="device-img" src="../images/translation.png" alt="雙語逐字稿：每句下方附翻譯">
-  <p>逐字稿的<strong>翻譯</strong>按鈕循環三種檢視：原文 → 原文＋翻譯 → 只顯示翻譯。雙語檢視中，每一句的翻譯就緊跟在原文下方——先讀原文，下一行立刻對答案。第一次點擊會把內容翻譯成設定裡選的語言（預設繁體中文；也有 English、日本語、한국어、Español、Français、Deutsch、Tiếng Việt、Bahasa Indonesia、ภาษาไทย）。翻譯逐批填入、會快取，也會隨學習資料同步。</p>
+  <p>逐字稿的地球按鈕（<strong>翻譯</strong>）循環三種檢視：原文 → 原文＋翻譯 → 只顯示翻譯。雙語檢視中，每一句的翻譯就緊跟在原文下方——先讀原文，下一行立刻對答案。第一次點擊會把內容翻譯成設定 → <strong>AI 輸出語言</strong>所選的語言（預設繁體中文；也有 English、日本語、한국어、Español、Français、Deutsch、Tiếng Việt、Bahasa Indonesia、ภาษาไทย）。翻譯逐批填入、會快取，也會隨學習資料同步。</p>
   <p>打開逐字稿絕不會偷偷啟動付費翻譯——記住的雙語檢視只有在翻譯已經在快取裡時才會還原。</p>
 </section>
 
 <section id="shadowing">
   <h2>跟讀</h2>
   <img class="device-img" src="../images/shadowing.png" alt="跟讀模式：循環中的句子醒目顯示，底部是練習控制列">
-  <p>跟讀把逐字稿變成口說練習。從播放器的<strong>跟讀</strong>按鈕進入（需要是正在播放的單集，且逐字稿有時間戳）。練習控制列固定在逐字稿底部，翻譯檢視也照常運作，可以邊看句意邊跟讀。</p>
+  <p>跟讀把逐字稿變成口說練習。從播放器的<strong>跟讀</strong>按鈕進入（正在播放的單集，且逐字稿有時間戳時可用），或用逐字稿工具列的循環按鈕。練習控制列固定在逐字稿底部，翻譯檢視也照常運作，可以邊看句意邊跟讀。</p>
   <ul>
     <li>目前句子會<strong>循環播放</strong>；點任何一句就跳到那句。</li>
-    <li>控制列：上一句／下一句、重複這句／停止重複、錄音／停止錄音、播放我的錄音，以及次數按鈕——×1 / ×2 / ×3 / ×5 / ∞。</li>
-    <li>設定有限次數時，句子播完最後一遍會<strong>自動開始錄音</strong>；停止錄音後立刻回放，方便和原音比對。</li>
-    <li>每句保留一段錄音，新的覆蓋舊的。錄音只存在裝置上。</li>
+    <li>控制列：上一句／重播／下一句、麥克風錄下你的朗讀、回放你的錄音，以及<strong>重複次數</strong>選單——1 次 / 2 次 / 3 次 / 5 次 / 無限。</li>
+    <li>設定有限次數時，句子播完指定次數會<strong>自動開始錄音</strong>；停止錄音後立刻回放，方便和原音比對。</li>
+    <li>每句保留一段錄音，新的覆蓋舊的。錄音只存在裝置上。第一次錄音會請求麥克風權限。</li>
   </ul>
 </section>
 
 <section id="handouts">
   <h2>AI 講義</h2>
   <img class="device-img" src="../images/handout.png" alt="AI 講義：內容說明與文法重點區塊">
-  <p><strong>AI 講義</strong>按鈕從單集的逐字稿產生複習講義（沒有逐字稿會先自動產生）。每份講義固定四個區塊：<strong>內容說明</strong>、<strong>文法重點</strong>、<strong>例句</strong>（附中文翻譯）、<strong>單字</strong>（含發音與中文意思的表格）。外語內容保留原文字。</p>
-  <p>超過約 15 分鐘的單集會分成 Part I / II / III。講義以可縮放的畫面呈現，跟隨深淺色主題；長按按鈕可重新產生或刪除。</p>
-</section>
-
-<section id="pdf">
-  <h2>PDF 講義</h2>
-  <p>部分單集會隨音檔附上官方 PDF 講義。這些單集會顯示<strong>講義</strong>按鈕（ⓘ 圖示）——尚未離線保存時是空心，存好後變實心。打開後是全螢幕閱讀器，音檔繼續播放；有多個附件的單集會有<strong>選擇附件</strong>切換。下載單集音檔時，PDF 會自動一併下載。</p>
+  <p><strong>AI 講義</strong>按鈕從單集的逐字稿產生複習講義（沒有逐字稿會先自動產生）。每份講義固定四個區塊，以你的 <strong>AI 輸出語言</strong>撰寫：<strong>內容說明</strong>（這一集在講什麼）、<strong>文法重點</strong>、<strong>例句</strong>（附翻譯）、<strong>單字</strong>（含發音與意思的表格）。外語內容保留原文字。</p>
+  <p>超過約 15 分鐘的單集會分成 Part I / II / III。長按按鈕可重新產生或刪除講義。</p>
 </section>
 
 <section id="ai-tab">
   <h2>AI 資料庫</h2>
   <img class="device-img" src="../images/ai-tab.png" alt="AI 分頁列出已有逐字稿與講義的單集">
-  <p><strong>AI</strong> 分頁列出所有已產生逐字稿或講義的單集，可依節目或語言分組——你的學習教材都在這裡，依單集順序排列。這裡的內容不需要設定 AI 也能打開，先前（或從其他裝置同步來）的教材永遠讀得到。</p>
+  <p><strong>AI</strong> 分頁列出所有已產生逐字稿或講義的單集，可依節目或語言分組——你產生的學習教材都集中在這裡。這裡的內容不需要設定 AI 也能打開，先前（或從其他裝置同步來）的教材永遠讀得到。</p>
 </section>
 
 <section id="favorites-notes">
-  <h2>收藏與註記</h2>
+  <h2>收藏與單集註記</h2>
   <img class="device-img" src="../images/favorites.png" alt="收藏分頁">
-  <p>愛心有兩層：<strong>單集</strong>（任何單集列或播放器裡的愛心）與整個<strong>節目</strong>（節目頁的愛心）。兩者都集中在收藏分頁；在那裡向左滑可移除單集。</p>
-  <p><strong>註記：</strong>單集標題常常只有「EP12」，所以你可以幫任何單集寫註記——在任何地方<strong>長按</strong>單集列（或在節目的單集列表向左滑）打開編輯器。註記會顯示在每個列表的單集標題下方，也會隨學習資料同步。</p>
+  <p>在任何單集列或播放器裡按愛心，單集就會集中到收藏分頁，依節目分組。在那裡向左滑可移除。</p>
+  <p><strong>註記：</strong>單集標題常常只有「EP12」，所以你可以幫任何單集寫註記——在任何地方<strong>長按</strong>單集列，選<strong>新增註記</strong>（或<strong>編輯註記</strong>）。註記會以額外一行顯示在每個列表的單集標題下方。</p>
 </section>
 
 <section id="widgets">
   <h2>主畫面小工具</h2>
-  <p>四個可調整大小的小工具，讓練習一按就開始；版面依你給的尺寸自動調整。</p>
+  <p>五個小工具讓練習一按就開始；版面依你給的尺寸自動調整，繼續收聽與學習紀錄還提供鎖定畫面尺寸。</p>
   <div class="widget-list">
     <div class="widget-card">
       <img src="../images/widget-upnext.png" alt="繼續收聽小工具：正在播放的單集與播放控制" loading="lazy">
@@ -239,27 +233,41 @@
     <div class="widget-card">
       <img src="../images/widget-shows.png" alt="我的節目小工具：節目封面牆" loading="lazy">
       <h3>我的節目</h3>
-      <p>收藏節目與訂閱 Podcast 的封面牆，一按就打開節目。預設依最近收聽排序；編輯小工具可自選要顯示哪些節目與順序，還能放多個小工具、各釘選不同組合。</p>
+      <p>訂閱節目的封面牆，一按就打開節目。預設依最近收聽排序；編輯小工具可自選要顯示哪些節目與順序，還能放多個小工具、各釘選不同組合。</p>
     </div>
     <div class="widget-card">
-      <img src="../images/widget-stats.png" alt="學習紀錄小工具：2x1 格顯示今日分鐘數與連續天數" loading="lazy">
+      <img src="../images/widget-stats.png" alt="學習紀錄小工具：今日分鐘數與連續天數" loading="lazy">
       <h3>學習紀錄</h3>
-      <p>今日學習分鐘數、連續 N 天與本週總計——最小 2×1 就放得下，空間越大數字越大。開啟雲端同步後，數字會跨裝置合併。點擊開啟 App。</p>
+      <p>今日聆聽分鐘數對照 30 分鐘目標環、連續 N 天，以及本週總計。點擊開啟 App。</p>
     </div>
   </div>
+  <p>還有<strong>最新單集</strong>：加入小工具時選一個節目（<strong>選擇節目</strong>），就會顯示該節目的最新幾集，每集都有播放鍵。</p>
+</section>
+
+<section id="siri">
+  <h2>Siri</h2>
+  <p>NerLan 註冊了 App 捷徑，Siri 可以直接用聲音操作：</p>
+  <ul>
+    <li><strong>播放節目</strong>——「NerLan 播放〈節目〉」／「NerLan play 〈show〉」</li>
+    <li><strong>播放最新一集</strong>——「在 NerLan 播放〈節目〉的最新一集」</li>
+    <li><strong>繼續上次的節目</strong>——「在 NerLan 繼續上次的節目」／「Resume NerLan」</li>
+    <li><strong>設定播放速度</strong>——「在 NerLan 用〈速度〉播放」</li>
+    <li><strong>查詢學習時間</strong>——「我在 NerLan 聽了多久」／「How long did I listen in NerLan」</li>
+  </ul>
+  <p>Podcast 名稱通常不是 Siri 聽得清楚的東西，所以每個節目頁都有對話泡泡按鈕，開啟 <strong>Siri 名稱</strong>：給節目取個簡短的暱稱，畫面會列出 Siri 聽得懂的所有說法（<strong>Siri 聽得懂的說法</strong>），包括羅馬拼音與語言名稱的別名。</p>
 </section>
 
 <section id="sync">
-  <h2>Google 雲端同步</h2>
-  <p>在設定 → <strong>Google 雲端同步</strong>登入並開啟<strong>同步到 Google 雲端硬碟</strong>。你的學習資料——收藏、單集註記、Podcast 訂閱、逐字稿、翻譯、AI 講義與聆聽統計——會同步到雲端硬碟的私人應用程式資料夾，並在多部裝置間合併。音檔、PDF 與跟讀錄音不會上傳。<strong>立即同步</strong>可手動觸發；狀態列會顯示進度與結果。</p>
+  <h2>iCloud 同步</h2>
+  <p>開啟設定 → <strong>同步到 iCloud</strong>，你的逐字稿、翻譯與 AI 講義就會備份到 iCloud，並在登入同一個 Apple ID 的裝置之間合併——重新安裝後也會自動回來。聆聽統計同樣會跨裝置合併。音檔與跟讀錄音只留在本機。需要登入 iCloud 並開啟 iCloud 雲碟。</p>
 </section>
 
 <section id="stats">
   <h2>統計</h2>
   <p>設定 → <strong>統計</strong>有兩個畫面：</p>
   <ul>
-    <li><strong>使用統計</strong>——總聆聽時間、完成單集、連續聆聽天數、今日／本週／本月，日／週／月趨勢圖，以及最常聽的節目。多裝置同步後合併計算。</li>
-    <li><strong>資料統計</strong>——儲存空間盤點：收藏、下載與佔用空間、講義附件、快取大小、AI 內容數量，以及已下載內容的語言分布。</li>
+    <li><strong>使用統計</strong>——總聆聽時間、完成單集、連續聆聽天數、今日／本週／本月，日／週／月趨勢圖，以及最常聽節目。多裝置同步後合併計算。</li>
+    <li><strong>資料統計</strong>——儲存空間盤點：收藏、下載與佔用空間、快取大小、AI 內容數量（逐字稿／AI 講義／翻譯），以及已下載內容的語言分布。</li>
   </ul>
 </section>
 
@@ -267,10 +275,9 @@
   <h2>設定總覽</h2>
   <p>從節目分頁的齒輪開啟。</p>
   <div class="setting-item"><div class="setting-item__name">API 來源</div><div class="setting-item__desc"><span class="tag">切換</span>OpenAI 官方 或 自訂——見<a href="#ai-setup">設定 AI</a>。兩組設定都會保存，切換不會遺失。</div></div>
-  <div class="setting-item"><div class="setting-item__name">翻譯語言</div><div class="setting-item__desc"><span class="tag">選單</span>逐字稿翻譯的目標語言。預設：繁體中文。</div></div>
-  <div class="setting-item"><div class="setting-item__name">置中捲動動畫</div><div class="setting-item__desc"><span class="tag">開關</span>播放時把朗讀中的句子平滑捲到畫面中央。預設開啟；電子紙裝置建議關閉以避免殘影。</div></div>
-  <div class="setting-item"><div class="setting-item__name">串流時自動快取</div><div class="setting-item__desc"><span class="tag">開關</span>保留串流聽過的音檔，聽完整集即可離線重播。預設關閉。清除快取音檔 可清空。</div></div>
-  <div class="setting-item"><div class="setting-item__name">Google 雲端同步</div><div class="setting-item__desc">登入、同步開關、立即同步、登出——見<a href="#sync">同步</a>。</div></div>
+  <div class="setting-item"><div class="setting-item__name">AI 輸出語言</div><div class="setting-item__desc"><span class="tag">選單</span>講義說明所用的語言，也是逐字稿翻譯的目標語言。預設：繁體中文。</div></div>
+  <div class="setting-item"><div class="setting-item__name">串流時自動快取</div><div class="setting-item__desc"><span class="tag">開關</span>保留串流聽過的音檔，聽完整集即可離線重播。預設關閉。清除快取音檔 可清空快取並顯示目前大小。</div></div>
+  <div class="setting-item"><div class="setting-item__name">同步到 iCloud</div><div class="setting-item__desc"><span class="tag">開關</span>把逐字稿、翻譯與 AI 講義備份到 iCloud——見 <a href="#sync">iCloud 同步</a>。</div></div>
   <div class="setting-item"><div class="setting-item__name">清除所有 AI 內容</div><div class="setting-item__desc"><span class="tag">動作</span>確認後刪除所有已儲存的逐字稿與 AI 講義。</div></div>
   <div class="setting-item"><div class="setting-item__name">統計</div><div class="setting-item__desc">使用統計 與 資料統計——見<a href="#stats">統計</a>。</div></div>
 </section>
@@ -278,9 +285,9 @@
 <section id="tips">
   <h2>小技巧</h2>
   <ul>
-    <li><strong>電子紙裝置：</strong>關閉 置中捲動動畫，逐字稿會逐句跳頁而不是平滑捲動；下載／快取徽章以實心與否區分，不靠顏色。</li>
-    <li><strong>Deep link：</strong><code>nerlan://</code> 協定可以從任何地方開啟 App——<code>nerlan://player</code>（播放器）、<code>nerlan://show?id=…</code>（節目單集列表）、<code>nerlan://tab?name=programs|favorites|downloads|ai</code>（切換分頁）。小工具用的就是這些，自動化工具也可以用。</li>
+    <li><strong>Deep link：</strong><code>nerlan://</code> 協定可以從任何地方開啟 App——<code>nerlan://player</code>（播放器）、<code>nerlan://play?id=…</code>（單集）、<code>nerlan://show?id=…&amp;podcast=1</code>（節目單集列表）、<code>nerlan://tab?name=programs|favorites|downloads|ai</code>（切換分頁）。小工具用的就是這些，捷徑 App 也可以用。</li>
     <li><strong>不會偷跑：</strong>AI 內容只在你明確點擊時才產生；串流也只在你開啟快取後才保存。</li>
+    <li><strong>Android：</strong>提供相同學習工具的 Android 版以 APK 形式發布——見<a href="download.html">下載</a>。</li>
   </ul>
 </section>
 

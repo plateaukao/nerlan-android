@@ -4,7 +4,7 @@
 
 NerLan is an Android language-learning audio player for Taiwan's National Education Radio (國立教育廣播電台) **Channel+** platform. It makes the station's language-learning programs easy to browse, stream, and download for offline study — wrapped in a modern Jetpack Compose UI with Material 3 Expressive styling.
 
-Looking for iOS? There is a matching iOS app: [plateaukao/nerlan](https://github.com/plateaukao/nerlan).
+Looking for iOS? The matching iOS app is [on the App Store](https://apps.apple.com/tw/app/nerlan/id6782030130); source at [plateaukao/nerlan](https://github.com/plateaukao/nerlan).
 
 ## Features
 

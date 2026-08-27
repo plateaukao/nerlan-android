@@ -13,7 +13,7 @@
     gtag('config', 'G-XQSZXV7E00');
   </script>
   <title>NerLan User Guide</title>
-  <meta name="description" content="Everything in NerLan: browsing shows, the player, AI transcripts and handouts, translation, shadowing, downloads, widgets, sync, and settings.">
+  <meta name="description" content="Everything in NerLan: adding podcasts, the player, AI transcripts and handouts, translation, shadowing, downloads, widgets, Siri, iCloud sync, and settings.">
   <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -29,7 +29,7 @@
     <ul class="site-nav__links">
       <li><a href="guide.html" class="active">User Guide</a></li>
       <li><a href="download.html">Download</a></li>
-      <li><a href="https://github.com/plateaukao/nerlan-android">GitHub</a></li>
+      <li><a href="https://github.com/plateaukao/nerlan">GitHub</a></li>
     </ul>
   </div>
 </nav>
@@ -44,8 +44,8 @@
   </ul>
   <div class="toc-section">Listening</div>
   <ul>
-    <li><a href="#programs">Browsing programs</a></li>
     <li><a href="#podcasts">Adding podcasts</a></li>
+    <li><a href="#programs">Your shows</a></li>
     <li><a href="#player">The player</a></li>
     <li><a href="#downloads">Downloads &amp; cache</a></li>
   </ul>
@@ -56,14 +56,14 @@
     <li><a href="#translation">Translation</a></li>
     <li><a href="#shadowing">Shadowing</a></li>
     <li><a href="#handouts">AI handouts</a></li>
-    <li><a href="#pdf">PDF handouts</a></li>
     <li><a href="#ai-tab">The AI library</a></li>
   </ul>
   <div class="toc-section">Organizing</div>
   <ul>
     <li><a href="#favorites-notes">Favorites &amp; notes</a></li>
     <li><a href="#widgets">Home-screen widgets</a></li>
-    <li><a href="#sync">Google Drive sync</a></li>
+    <li><a href="#siri">Siri</a></li>
+    <li><a href="#sync">iCloud sync</a></li>
     <li><a href="#stats">Statistics</a></li>
   </ul>
   <div class="toc-section">Reference</div>
@@ -77,44 +77,43 @@
 
 <section id="overview">
   <h2>Overview</h2>
-  <p>NerLan is a listening-first language study app. It plays any podcast you add — Japanese, Korean, English, French, whatever you're learning — and on top of ordinary playback it layers study tools: AI-generated transcripts that follow the audio sentence by sentence, review handouts, line-by-line translation, and shadowing practice with your own voice recordings.</p>
+  <p>NerLan is a listening-first language study app for iPhone and iPad. It plays any podcast you add — Japanese, Korean, English, French, Spanish, whatever you're learning — and on top of ordinary playback it layers study tools: AI-generated transcripts that follow the audio sentence by sentence, review handouts, line-by-line translation, and shadowing practice with your own voice recordings.</p>
   <p>The interface is in Traditional Chinese. This guide gives every label in the app alongside an English explanation.</p>
-  <p>To start: open the <strong>節目</strong> (Programs) tab, pick a language chip, open a show, and tap an episode. Everything else — downloading, transcripts, handouts — is one more tap from there.</p>
+  <p>To start: open the <strong>節目</strong> (Shows) tab, tap <strong>＋</strong> to add a podcast, open the show, and tap an episode. Everything else — downloading, transcripts, handouts — is one more tap from there.</p>
 </section>
 
 <section id="interface">
   <h2>The four tabs</h2>
   <div class="table-wrap"><table>
     <tr><th>Tab</th><th>What it holds</th></tr>
-    <tr><td><strong>節目</strong> (Programs)</td><td>Your shows, with language filters, plus the settings gear.</td></tr>
-    <tr><td><strong>收藏</strong> (Favorites)</td><td>Programs and episodes you've hearted, grouped by show.</td></tr>
+    <tr><td><strong>節目</strong> (Shows)</td><td>The podcasts you subscribe to, plus the add (＋) and settings (gear) buttons.</td></tr>
+    <tr><td><strong>收藏</strong> (Favorites)</td><td>Episodes you've hearted, grouped by show.</td></tr>
     <tr><td><strong>下載</strong> (Downloads)</td><td>Episodes stored offline — explicit downloads and auto-cached streams.</td></tr>
     <tr><td><strong>AI</strong></td><td>Every episode that has a generated transcript or handout — your study library.</td></tr>
   </table></div>
-  <p>A mini player floats above the tabs whenever something is loaded: tap its cover or title to open the full player. Tabs keep their state — filters, scroll position, and open program pages survive switching away and back.</p>
-  <p>On large screens (tablets, desktop windows) the layout becomes two-pane: the browser shrinks to a left column and study material — transcript, handout, or PDF — fills the right side automatically while you listen.</p>
-</section>
-
-<section id="programs">
-  <h2>Browsing programs</h2>
-  <img class="device-img" src="images/programs.png" alt="Program list filtered to Japanese">
-  <p>The <strong>節目</strong> tab lists your shows, grouped by language. A row of filter chips sits at the top; the most-studied languages (英語, 日語, 韓語, 法語) come first, and the chevron (<strong>展開語言</strong>) expands the row to show every language. Your chosen filter is remembered across launches; <strong>全部</strong> shows everything.</p>
-  <p>Each show row shows its cover, name, level (e.g. 初階) where one is published, and episode count (<strong>共 N 集</strong>). Tap one to open its page:</p>
-  <img class="device-img" src="images/program-detail.png" alt="Program page">
-  <ul>
-    <li>The heart in the top bar (<strong>收藏節目</strong>) favorites the whole program — it then appears in 收藏 and in the 我的節目 widget.</li>
-    <li>The introduction is clamped to three lines; tap it to expand.</li>
-    <li><strong>單集列表</strong> is the episode archive, oldest first, loading more as you scroll. Loaded pages are cached, so reopening the program is instant.</li>
-    <li>Each episode row has a heart (<strong>收藏</strong>) and a download button (<strong>下載</strong>); tapping the row plays it with the rest of the list queued. Pull down to refresh.</li>
-  </ul>
-  <p>The catalog itself is served from an on-disk cache, so browsing works offline and the app opens instantly; pull down to fetch fresh listings.</p>
+  <p>A mini player floats above the tabs whenever something is loaded: tap its cover or title to open the full player. Tabs keep their state — scroll position and open show pages survive switching away and back.</p>
+  <p>On iPad the layout becomes two-pane: the browser sits in a left column and study material — the transcript or handout of the episode you're listening to — fills the right side automatically.</p>
 </section>
 
 <section id="podcasts">
   <h2>Adding podcasts</h2>
-  <img class="device-img" src="images/podcast.png" alt="Program list with a subscribed Korean podcast under 我的 Podcast">
-  <p>The <strong>＋</strong> button in the 節目 tab header opens <strong>新增 Podcast</strong>. Paste either an Apple Podcasts link (podcasts.apple.com or an apple.co short link) or a raw RSS feed URL — the dialog offers a shortcut, <strong>到 Apple Podcasts 搜尋節目</strong>, to search shows in your browser and copy the link back.</p>
-  <p>Subscribed shows appear under <strong>我的 Podcast</strong> at the top of the 節目 tab (when no language filter is active). Long-press a podcast row to <strong>取消訂閱</strong> (unsubscribe). Podcast episode pages work like any other show page: pull to refresh for new episodes, hearts, and downloads.</p>
+  <img class="device-img" src="images/podcast.png" alt="The 新增 Podcast sheet with a field for an Apple Podcasts or RSS link">
+  <p>The <strong>＋</strong> button in the 節目 tab opens <strong>新增 Podcast</strong>. Paste either an Apple Podcasts link (podcasts.apple.com or an apple.co short link) or a raw RSS feed URL and tap <strong>新增</strong>. The sheet offers a shortcut, <strong>到 Apple Podcasts 搜尋節目</strong>, that opens Apple Podcasts so you can search for a show, copy its link, and paste it back.</p>
+  <p>Subscribed shows appear under <strong>我的 Podcast</strong> in the 節目 tab. Swipe a show left to <strong>取消訂閱</strong> (unsubscribe).</p>
+</section>
+
+<section id="programs">
+  <h2>Your shows</h2>
+  <img class="device-img" src="images/programs.png" alt="The 節目 tab listing five subscribed podcasts">
+  <p>The <strong>節目</strong> tab lists your subscriptions: cover, title, author, and episode count (<strong>共 N 集</strong>). Tap one to open its page:</p>
+  <img class="device-img" src="images/program-detail.png" alt="A podcast page with its episode list">
+  <ul>
+    <li>The introduction is clamped to three lines; tap it to expand.</li>
+    <li><strong>單集列表</strong> is the full episode list from the feed, newest first. Pull down to refresh for new episodes.</li>
+    <li>Each episode row has a heart (<strong>收藏</strong>) and a download button (<strong>下載</strong>); tapping the row plays it with the rest of the list queued behind it.</li>
+    <li>Long-press an episode to attach a <strong>註記</strong> (note) — see <a href="#favorites-notes">Favorites &amp; notes</a>.</li>
+    <li>The speech-bubble button in the top bar sets the show's <strong>Siri 名稱</strong> — see <a href="#siri">Siri</a>.</li>
+  </ul>
 </section>
 
 <section id="player">
@@ -122,25 +121,25 @@
   <img class="device-img" src="images/player.png" alt="Full player">
   <p>Tap the mini player to open the full player sheet.</p>
   <ul>
-    <li><strong>Transport:</strong> 上一集 · 倒退15秒 · 播放/暫停 · 快轉15秒 · 下一集. The scrubber shows elapsed and total time.</li>
-    <li><strong>Repeat</strong> cycles through 不重複 (off) → repeat queue → repeat one; <strong>speed</strong> offers 0.5×–2×. Both are remembered across launches.</li>
-    <li><strong>收藏</strong> hearts the episode; the download control shows 下載, a progress ring, or 已下載.</li>
-    <li>When an episode has PDF attachments, a <strong>講義</strong> button opens them (see <a href="#pdf">PDF handouts</a>).</li>
-    <li>Once AI is configured, an extra row appears: <strong>字幕</strong> (in-player synced captions), <strong>跟讀</strong> (shadowing), <strong>逐字稿</strong> (transcript), and <strong>AI 講義</strong> (handout).</li>
+    <li><strong>Transport:</strong> previous · back 15 s · play/pause · forward 15 s · next. The scrubber shows elapsed and total time.</li>
+    <li><strong>Repeat</strong> cycles off → repeat queue → repeat one; <strong>speed</strong> offers 0.5×–2×. Both are remembered across launches.</li>
+    <li><strong>收藏</strong> hearts the episode; the download control shows 下載, a spinner, or 已下載.</li>
+    <li>Once AI is configured, an extra row appears: <strong>逐字稿</strong> (transcript) and <strong>AI 講義</strong> (handout), joined by <strong>字幕</strong> (in-player synced captions) and <strong>跟讀</strong> (shadowing) once the episode has a timestamped transcript.</li>
+    <li>Tap the cover art to jump to the show's episode list.</li>
   </ul>
-  <p>Playback continues in the background with a media notification and lock-screen controls, pauses when headphones unplug, and holds a wake lock so screen-off streaming doesn't stall. Every episode remembers its position and resumes where you left off; finishing an episode clears the resume point so a re-listen starts fresh.</p>
+  <p>Playback continues in the background with lock-screen and Control Center controls. Every episode remembers its position and resumes where you left off; finishing an episode clears the resume point so a re-listen starts fresh.</p>
 </section>
 
 <section id="downloads">
   <h2>Downloads &amp; streaming cache</h2>
   <img class="device-img" src="images/downloads.png" alt="Downloads tab">
-  <p>Tapping <strong>下載</strong> on any episode saves its audio for offline listening — and automatically saves the episode's PDF handouts along with it. Up to three downloads run at once; progress shows as a ring on the row.</p>
-  <p>Separately, <strong>串流快取</strong> (streaming cache, off by default — see <a href="#settings">Settings</a>) keeps the bytes you stream: an episode played to the end becomes fully cached and playable offline, capped at 2&nbsp;GB with least-recently-used eviction.</p>
-  <p>The <strong>下載</strong> tab shows both kinds side by side, sorted in episode order:</p>
+  <p>Tapping <strong>下載</strong> on any episode saves its audio for offline listening.</p>
+  <p>Separately, <strong>串流時自動快取</strong> (streaming cache, off by default — see <a href="#settings">Settings</a>) keeps the audio you stream: an episode played to the end becomes fully cached and playable offline. <strong>清除快取音檔</strong> in Settings empties the cache.</p>
+  <p>The <strong>下載</strong> tab shows both kinds side by side:</p>
   <ul>
-    <li>A <strong>filled check badge = 已下載</strong> (explicit download); an <strong>outlined, dimmed check = 快取</strong> (cache capture). The fill — not just the color — tells them apart, so it reads on e-ink screens too.</li>
-    <li>The filter icon (<strong>篩選</strong>) narrows to 全部 / 已下載 / 快取; the segmented control groups by <strong>節目</strong> (program) or <strong>語言</strong> (language).</li>
-    <li>Swipe a row right-to-left to delete the local audio. Long-press to edit its note.</li>
+    <li>A <strong>green check = 已下載</strong> (explicit download); a <strong>dimmed check = 快取</strong> (cache capture).</li>
+    <li>The filter button (<strong>顯示</strong>) narrows to 全部 / 已下載 / 快取; the segmented control groups by <strong>節目</strong> (show) or <strong>語言</strong> (language).</li>
+    <li>Swipe a row left to delete the local audio. Long-press to edit its note.</li>
   </ul>
 </section>
 
@@ -150,15 +149,15 @@
   <h3>OpenAI 官方 (official)</h3>
   <img class="device-img" src="images/settings.png" alt="Settings with the official OpenAI provider selected">
   <ul>
-    <li><strong>OpenAI API 金鑰</strong> — your key, stored on the device. Generation uses your own OpenAI credit.</li>
-    <li><strong>轉錄模型</strong> (transcription model) — whisper-1 (returns timestamps for synced captions), gpt-4o-mini-transcribe, or gpt-4o-transcribe.</li>
-    <li><strong>講義模型</strong> (handout model) — free text, default <code>gpt-4o</code>; used for handouts, translation, and sentence segmentation. <strong>恢復預設模型</strong> restores both defaults.</li>
+    <li><strong>OpenAI API 金鑰</strong> — your key, stored in the device Keychain. Generation uses your own OpenAI credit.</li>
+    <li><strong>轉錄模型</strong> (transcription model) — whisper-1 (returns timestamps for synced captions), gpt-4o-mini-transcribe, gpt-4o-transcribe, or gpt-4o-transcribe-diarize.</li>
+    <li><strong>講義模型</strong> (handout model) — free text; used for handouts, translation, and sentence segmentation. <strong>恢復預設模型</strong> restores both defaults.</li>
   </ul>
   <h3>自訂 (custom server)</h3>
   <img class="device-img" src="images/settings-custom.png" alt="Custom AI server settings">
   <p>Point the AI features at any OpenAI-compatible server — typically cheaper, or running on your own machine (whisperASR, Ollama, a proxy). Two endpoints are configured separately:</p>
   <ul>
-    <li><strong>轉錄伺服器</strong> — server URL (up to <code>/v1</code>), transcription model, and an optional API key. Used for <code>/audio/transcriptions</code>.</li>
+    <li><strong>轉錄伺服器</strong> — server URL (up to <code>/v1</code>), transcription model, and an optional API key. Used for <code>/audio/transcriptions</code>. The magnifier button (<strong>搜尋區域網路伺服器</strong>) finds whisperASR servers on your local network by Bonjour and fills in the address for you.</li>
     <li><strong>講義／翻譯伺服器</strong> — server URL, chat model, optional key, and a <strong>停用思考模式（no think）</strong> switch that sends <code>reasoning_effort=none</code> so local thinking models (qwen3, deepseek-r1, …) skip their reasoning dump. Used for handouts, translation, and sentence cleanup.</li>
     <li>Each block has a verify row — <strong>驗證轉錄伺服器</strong> / <strong>驗證講義／翻譯伺服器</strong> — that sends a real test request and shows a check on success or the server's own error message on failure.</li>
   </ul>
@@ -167,64 +166,58 @@
 
 <section id="transcripts">
   <h2>Transcripts (逐字稿)</h2>
-  <p>The <strong>逐字稿</strong> button — in the player or on episode rows — transcribes the episode into clean, punctuated sentences, one per line. An outlined icon means not generated yet; tapping starts the job and opens the result when it's ready. A filled icon opens the saved transcript instantly. Long-press for <strong>重新產生</strong> (regenerate) or <strong>刪除逐字稿</strong> (delete).</p>
-  <p>Long episodes are transcribed in ~20-minute chunks; the viewer opens as soon as the first chunk is ready and fills in the rest, showing progress like 轉錄中…（1/3）. Jobs keep running if you close the player.</p>
+  <p>The <strong>逐字稿</strong> button — in the player or on episode rows — transcribes the episode into clean, punctuated sentences, one per line. An outlined icon means not generated yet; tapping starts the job and shows its progress. A filled icon opens the saved transcript instantly. Long-press for <strong>重新產生</strong> (regenerate) or <strong>刪除逐字稿</strong> (delete). Jobs keep running if you close the player.</p>
   <img class="device-img" src="images/transcript.png" alt="Transcript with the spoken sentence highlighted and centred">
   <p>In the transcript viewer:</p>
   <ul>
     <li>With a timestamped model (whisper-1), the sentence being spoken is <strong>highlighted and kept centred</strong> as the audio plays. Tap 字幕 in the player to show the same synced view in place of the cover art.</li>
-    <li><strong>字體大小</strong> cycles three reading sizes; <strong>複製全部</strong> copies the whole text; the screen stays awake while a transcript is open.</li>
-    <li><strong>跟讀</strong> switches into shadowing mode (below); <strong>翻譯</strong> cycles translation views (below).</li>
+    <li>The toolbar cycles three <strong>font sizes</strong>, cycles the <strong>翻譯</strong> views (below), and <strong>copies the whole text</strong>; the screen stays awake while a transcript is open.</li>
+    <li>Long-press a sentence for <strong>複製</strong> (copy), <strong>從這裡播放</strong> (play from here), or <strong>重複這句</strong> (loop this sentence).</li>
   </ul>
 </section>
 
 <section id="translation">
   <h2>Translation (翻譯)</h2>
   <img class="device-img" src="images/translation.png" alt="Bilingual transcript: each sentence with its translation underneath">
-  <p>The transcript's <strong>翻譯</strong> button cycles three views: original → original + translation → translation only. In the bilingual view each sentence carries its translation directly underneath, so you read the original first and check yourself one line later. The first tap generates a translation into the language chosen in Settings → 翻譯語言 (default 繁體中文; also English, 日本語, 한국어, Español, Français, Deutsch, Tiếng Việt, Bahasa Indonesia, ภาษาไทย). Translations stream in batch by batch, are cached, and sync with your study material.</p>
+  <p>The transcript's globe button cycles three views: original → original + translation → translation only. In the bilingual view each sentence carries its translation directly underneath, so you read the original first and check yourself one line later. The first tap generates a translation into the language chosen in Settings → <strong>AI 輸出語言</strong> (default 繁體中文; also English, 日本語, 한국어, Español, Français, Deutsch, Tiếng Việt, Bahasa Indonesia, ภาษาไทย). Translations stream in batch by batch, are cached, and sync with your study material.</p>
   <p>Opening a transcript never silently starts a paid translation — a remembered bilingual view is only restored when the translation is already cached.</p>
 </section>
 
 <section id="shadowing">
   <h2>Shadowing (跟讀)</h2>
   <img class="device-img" src="images/shadowing.png" alt="Shadowing mode: looped sentence highlighted, practice controls at the bottom">
-  <p>Shadowing turns a transcript into speaking practice. Enter it from the player's <strong>跟讀</strong> button (available for the playing episode when its transcript has timestamps). The practice bar sits at the bottom of the transcript, and translation view keeps working, so you can shadow with meanings in sight.</p>
+  <p>Shadowing turns a transcript into speaking practice. Enter it from the player's <strong>跟讀</strong> button (available for the playing episode when its transcript has timestamps) or the loop button in the transcript toolbar. The practice bar sits at the bottom of the transcript, and translation view keeps working, so you can shadow with meanings in sight.</p>
   <ul>
     <li>The current sentence <strong>loops</strong>; tap any sentence to jump the loop there.</li>
-    <li>Controls: 上一句 / 下一句 (previous/next sentence), 重複這句 / 停止重複 (loop toggle), 錄音 / 停止錄音 (record), 播放我的錄音 (play my recording), and a repeat-count button — ×1 / ×2 / ×3 / ×5 / ∞.</li>
+    <li>Controls: previous / replay / next sentence, the microphone to record your reading, play-back of your recording, and a <strong>重複次數</strong> menu — 1 次 / 2 次 / 3 次 / 5 次 / 無限.</li>
     <li>With a finite count, the loop plays that many times and then <strong>automatically starts recording</strong> your reading; stopping plays your take back so you can compare against the original.</li>
-    <li>One recording is kept per sentence; a new attempt overwrites it. Recordings stay on the device.</li>
+    <li>One recording is kept per sentence; a new attempt overwrites it. Recordings stay on the device. The first recording asks for microphone permission.</li>
   </ul>
 </section>
 
 <section id="handouts">
   <h2>AI handouts (AI 講義)</h2>
   <img class="device-img" src="images/handout.png" alt="AI handout with 內容說明 and 文法重點 sections">
-  <p>The <strong>AI 講義</strong> button builds a review sheet from the episode's transcript (generating the transcript first if needed). Every handout has four sections in Traditional Chinese: <strong>內容說明</strong> (what the episode covers), <strong>文法重點</strong> (grammar points), <strong>例句</strong> (example sentences with translations), and <strong>單字</strong> (a vocabulary table with pronunciation and meanings). Foreign-language material keeps its original script.</p>
-  <p>Episodes longer than ~15 minutes are split into Part I / II / III sections. The handout renders in a zoomable view matching the light/dark theme; long-press its button to regenerate or delete.</p>
-</section>
-
-<section id="pdf">
-  <h2>PDF handouts (講義)</h2>
-  <p>Some episodes come with official PDF handouts published alongside the audio. Those episodes show a <strong>講義</strong> button (an ⓘ icon) — outlined if the PDF hasn't been saved yet, filled once it's offline. It opens a full-screen reader that keeps the audio playing; episodes with several attachments get a <strong>選擇附件</strong> switcher. PDFs download automatically alongside the episode's audio.</p>
+  <p>The <strong>AI 講義</strong> button builds a review sheet from the episode's transcript (generating the transcript first if needed). Every handout has four sections, written in your <strong>AI 輸出語言</strong>: <strong>內容說明</strong> (what the episode covers), <strong>文法重點</strong> (grammar points), <strong>例句</strong> (example sentences with translations), and <strong>單字</strong> (a vocabulary table with pronunciation and meanings). Foreign-language material keeps its original script.</p>
+  <p>Episodes longer than ~15 minutes are split into Part I / II / III sections. Long-press the button to regenerate or delete the handout.</p>
 </section>
 
 <section id="ai-tab">
   <h2>The AI library</h2>
   <img class="device-img" src="images/ai-tab.png" alt="AI tab listing episodes with transcripts and handouts">
-  <p>The <strong>AI</strong> tab lists every episode that has a transcript or handout, grouped by 節目 or 語言 — your generated study material in one place, in episode order. Content here opens even with no AI configured, so material generated earlier (or synced from another device) is always readable.</p>
+  <p>The <strong>AI</strong> tab lists every episode that has a transcript or handout, grouped by 節目 or 語言 — your generated study material in one place. Content here opens even with no AI configured, so material generated earlier (or synced from another device) is always readable.</p>
 </section>
 
 <section id="favorites-notes">
   <h2>Favorites &amp; episode notes</h2>
   <img class="device-img" src="images/favorites.png" alt="Favorites tab">
-  <p>Hearts work on two levels: <strong>episodes</strong> (heart on any row or in the player) and whole <strong>programs</strong> (heart on the program page). Both collect in the 收藏 tab; swipe an episode right-to-left there to remove it.</p>
-  <p><strong>Notes:</strong> episode titles are often just "EP12", so you can attach a note to any episode — <strong>long-press</strong> a row anywhere (or swipe right-to-left in a program's episode list) to open the editor. The note appears as an extra line under the episode title in every list, and syncs with your other study material.</p>
+  <p>Heart any episode — on its row or in the player — and it collects in the 收藏 tab, grouped by show. Swipe an episode left there to remove it.</p>
+  <p><strong>Notes:</strong> episode titles are often just "EP12", so you can attach a note to any episode — <strong>long-press</strong> a row anywhere and choose <strong>新增註記</strong> (or <strong>編輯註記</strong>). The note appears as an extra line under the episode title in every list.</p>
 </section>
 
 <section id="widgets">
   <h2>Home-screen widgets</h2>
-  <p>Four resizable widgets keep practice one tap away; their layouts adapt to the size you give them.</p>
+  <p>Five widgets keep practice one tap away; their layouts adapt to the size you give them, and 繼續收聽 and 學習紀錄 also come in Lock Screen sizes.</p>
   <div class="widget-list">
     <div class="widget-card">
       <img src="images/widget-upnext.png" alt="繼續收聽 widget showing the playing episode with transport controls" loading="lazy">
@@ -239,27 +232,41 @@
     <div class="widget-card">
       <img src="images/widget-shows.png" alt="我的節目 widget with a grid of show covers" loading="lazy">
       <h3>我的節目</h3>
-      <p>A cover grid of your favorited programs and subscribed podcasts — one tap opens the show. By default it orders by recent listening; edit the widget to hand-pick exactly which shows appear and in what order, and place several copies pinned to different sets.</p>
+      <p>A cover grid of your subscribed shows — one tap opens the show. By default it orders by recent listening; edit the widget to hand-pick exactly which shows appear and in what order, and place several copies pinned to different sets.</p>
     </div>
     <div class="widget-card">
-      <img src="images/widget-stats.png" alt="學習紀錄 widget with today's minutes and streak in a 2x1 cell" loading="lazy">
+      <img src="images/widget-stats.png" alt="學習紀錄 widget with today's minutes and streak" loading="lazy">
       <h3>學習紀錄</h3>
-      <p>Today's listening minutes, your 連續 N 天 streak, and this week's total — compact enough for a 2×1 cell, growing the number as you give it more room. The numbers merge across devices when Drive sync is on; tapping it opens the app.</p>
+      <p>Today's listening minutes against a 30-minute goal ring, your 連續 N 天 streak, and this week's total. Tapping it opens the app.</p>
     </div>
   </div>
+  <p>There is also <strong>最新單集</strong>: pick one show when adding the widget (<strong>選擇節目</strong>) and it shows that show's newest episodes with a play button on each.</p>
+</section>
+
+<section id="siri">
+  <h2>Siri</h2>
+  <p>NerLan registers App Shortcuts, so Siri can drive it hands-free:</p>
+  <ul>
+    <li><strong>播放節目</strong> — "NerLan 播放 〈show〉" / "NerLan play 〈show〉"</li>
+    <li><strong>播放最新一集</strong> — "在 NerLan 播放 〈show〉的最新一集"</li>
+    <li><strong>繼續上次的節目</strong> — "在 NerLan 繼續上次的節目" / "Resume NerLan"</li>
+    <li><strong>設定播放速度</strong> — "在 NerLan 用 〈speed〉播放"</li>
+    <li><strong>查詢學習時間</strong> — "我在 NerLan 聽了多久" / "How long did I listen in NerLan"</li>
+  </ul>
+  <p>Podcast titles are rarely something Siri hears cleanly, so each show page has a speech-bubble button that opens <strong>Siri 名稱</strong>: give the show a short nickname, and the sheet lists every phrasing Siri will understand (<strong>Siri 聽得懂的說法</strong>), including romanized and language-name aliases.</p>
 </section>
 
 <section id="sync">
-  <h2>Google Drive sync</h2>
-  <p>Sign in under Settings → <strong>Google 雲端同步</strong> and enable <strong>同步到 Google 雲端硬碟</strong>. Your study data — favorites, episode notes, podcast subscriptions, transcripts, translations, AI handouts, and listening statistics — syncs to your Drive's private app folder and merges across devices. Audio files, PDFs, and shadowing recordings stay local. <strong>立即同步</strong> forces a sync; a status line shows progress and results.</p>
+  <h2>iCloud sync</h2>
+  <p>Turn on Settings → <strong>同步到 iCloud</strong> and your transcripts, translations, and AI handouts are backed up to iCloud and merged across devices signed in to the same Apple ID — they also come back automatically after a reinstall. Listening statistics merge across devices too. Audio files and shadowing recordings stay local. Requires being signed in to iCloud with iCloud Drive enabled.</p>
 </section>
 
 <section id="stats">
   <h2>Statistics</h2>
   <p>Settings → <strong>統計</strong> opens two screens:</p>
   <ul>
-    <li><strong>使用統計</strong> — total listening time, completed episodes, streak (連續聆聽天數), today/week/month totals, a 日/週/月 trend chart, and your most-listened programs. Merged across synced devices.</li>
-    <li><strong>資料統計</strong> — a storage inventory: favorites, downloads and their size, PDF attachments, cache size, AI content counts, and a per-language breakdown of downloads.</li>
+    <li><strong>使用統計</strong> — total listening time, completed episodes, streak (連續聆聽天數), today/week/month totals, a 日/週/月 trend chart, and your most-listened shows (最常聽節目). Merged across synced devices.</li>
+    <li><strong>資料統計</strong> — a storage inventory: favorites, downloads and their size, cache size, AI content counts (逐字稿 / AI 講義 / 翻譯), and a per-language breakdown of downloads.</li>
   </ul>
 </section>
 
@@ -267,10 +274,9 @@
   <h2>Settings reference</h2>
   <p>Opened from the gear in the 節目 tab.</p>
   <div class="setting-item"><div class="setting-item__name">API 來源</div><div class="setting-item__desc"><span class="tag">Switch</span>OpenAI 官方 or 自訂 — see <a href="#ai-setup">Setting up AI</a>. Both configurations are kept, so switching is lossless.</div></div>
-  <div class="setting-item"><div class="setting-item__name">翻譯語言</div><div class="setting-item__desc"><span class="tag">Select</span>Target language for transcript translation. Default: 繁體中文.</div></div>
-  <div class="setting-item"><div class="setting-item__name">置中捲動動畫</div><div class="setting-item__desc"><span class="tag">Toggle</span>Smoothly scrolls the spoken sentence to the center of the transcript. On by default; turn it off on e-ink screens to avoid ghosting.</div></div>
-  <div class="setting-item"><div class="setting-item__name">串流時自動快取</div><div class="setting-item__desc"><span class="tag">Toggle</span>Keeps streamed audio so a fully played episode is available offline. Off by default. 清除快取音檔 empties the cache.</div></div>
-  <div class="setting-item"><div class="setting-item__name">Google 雲端同步</div><div class="setting-item__desc">Sign-in, sync toggle, 立即同步, and sign-out — see <a href="#sync">sync</a>.</div></div>
+  <div class="setting-item"><div class="setting-item__name">AI 輸出語言</div><div class="setting-item__desc"><span class="tag">Select</span>Language of handout explanations and the target of transcript translation. Default: 繁體中文.</div></div>
+  <div class="setting-item"><div class="setting-item__name">串流時自動快取</div><div class="setting-item__desc"><span class="tag">Toggle</span>Keeps streamed audio so a fully played episode is available offline. Off by default. 清除快取音檔 empties the cache and shows its current size.</div></div>
+  <div class="setting-item"><div class="setting-item__name">同步到 iCloud</div><div class="setting-item__desc"><span class="tag">Toggle</span>Backs up transcripts, translations, and AI handouts to iCloud — see <a href="#sync">iCloud sync</a>.</div></div>
   <div class="setting-item"><div class="setting-item__name">清除所有 AI 內容</div><div class="setting-item__desc"><span class="tag">Action</span>Deletes all saved transcripts and AI handouts, after confirmation.</div></div>
   <div class="setting-item"><div class="setting-item__name">統計</div><div class="setting-item__desc">使用統計 and 資料統計 — see <a href="#stats">statistics</a>.</div></div>
 </section>
@@ -278,9 +284,9 @@
 <section id="tips">
   <h2>Tips &amp; extras</h2>
   <ul>
-    <li><strong>E-ink devices:</strong> turn off 置中捲動動畫 for a page-jump transcript instead of a smooth scroll, and note that download/cache badges differ by fill, not color.</li>
-    <li><strong>Deep links:</strong> the <code>nerlan://</code> scheme opens the app from anywhere — <code>nerlan://player</code> (the player), <code>nerlan://show?id=…</code> (a show's episode list), <code>nerlan://tab?name=programs|favorites|downloads|ai</code> (a tab). The widgets use these, and so can any automation tool.</li>
+    <li><strong>Deep links:</strong> the <code>nerlan://</code> scheme opens the app from anywhere — <code>nerlan://player</code> (the player), <code>nerlan://play?id=…</code> (an episode), <code>nerlan://show?id=…&amp;podcast=1</code> (a show's episode list), <code>nerlan://tab?name=programs|favorites|downloads|ai</code> (a tab). The widgets use these, and so can the Shortcuts app.</li>
     <li><strong>Nothing runs unasked:</strong> AI generation only ever starts from an explicit tap, and streaming never caches unless you opted in.</li>
+    <li><strong>Android:</strong> a companion app with the same study tools is available as an APK — see <a href="download.html">Download</a>.</li>
   </ul>
 </section>
 
